@@ -1,6 +1,5 @@
 package main.java.com.miage.parcauto;
 
-import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -8,7 +7,18 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Modality;
@@ -33,7 +43,7 @@ import java.util.stream.Collectors;
 
 public class UserManagementPanelController implements ViewController.InitializableServices {
 
-    private static final Logger CONTROLEUR_USER_LOGGER = Logger.getLogger(UserManagementPanelController.class.getName());
+    private static final Logger CONTROLEUR_UTILISATEUR_LOGGER = Logger.getLogger(UserManagementPanelController.class.getName());
     private BusinessLogicService serviceLogiqueMetier;
     private SecurityManager gestionnaireSecurite;
     private ReportingEngine moteurRapports;
@@ -46,9 +56,9 @@ public class UserManagementPanelController implements ViewController.Initializab
     @FXML private TableColumn<UtilisateurDTO, String> colPersonnelAssocieTable;
 
     @FXML private Button boutonCreerUtilisateur;
-    @FXML private Button boutonModifierUtilisateur; // Pour changer rôle, personnel associé
-    @FXML private Button boutonReinitialiserMotDePasse;
+    @FXML private Button boutonModifierUtilisateur;
     @FXML private Button boutonSupprimerUtilisateur;
+    @FXML private Button boutonReinitialiserMotDePasse;
     @FXML private Button boutonActualiserListeUtilisateurs;
 
     @FXML private TextField champRechercheLoginUtilisateur;
@@ -61,25 +71,15 @@ public class UserManagementPanelController implements ViewController.Initializab
         this.gestionnaireSecurite = Objects.requireNonNull(sm);
         this.moteurRapports = Objects.requireNonNull(re);
         this.servicePersistance = Objects.requireNonNull(ps);
-        CONTROLEUR_USER_LOGGER.fine("Dépendances services injectées dans UserManagementPanelController.");
+        CONTROLEUR_UTILISATEUR_LOGGER.fine("Dépendances services injectées dans UserManagementPanelController.");
     }
 
     @Override
     public void initialiserDonneesVue() {
-        CONTROLEUR_USER_LOGGER.info("Initialisation du panneau de gestion des utilisateurs.");
-        // Vérification de sécurité pour l'accès même à ce panneau
-        if (!gestionnaireSecurite.estAutorise(SessionManager.obtenirRoleUtilisateurActuel(), Permissions.UTILISATEUR_GERER_COMPTES)) {
-            afficherNotificationAlerteInterface("Accès Interdit", "Vous n'avez pas les droits nécessaires pour accéder à la gestion des utilisateurs.", Alert.AlertType.ERROR);
-            // Masquer le contenu ou le désactiver complètement
-            if (tableVueUtilisateurs != null && tableVueUtilisateurs.getParent() != null) {
-                tableVueUtilisateurs.getParent().setVisible(false);
-            }
-            return;
-        }
-
+        CONTROLEUR_UTILISATEUR_LOGGER.info("Initialisation des données et de la configuration pour le panneau de gestion des utilisateurs.");
         configurerColonnesTableUtilisateurs();
         chargerOptionsFiltresUtilisateurs();
-        configurerPermissionsActionsUtilisateurs(); // Les boutons sont déjà limités par l'accès au panel
+        configurerPermissionsActionsUtilisateurs();
         actionActualiserListeUtilisateurs();
 
         tableVueUtilisateurs.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
@@ -91,73 +91,70 @@ public class UserManagementPanelController implements ViewController.Initializab
         colIdUtilisateurTable.setCellValueFactory(new PropertyValueFactory<>("id"));
         colLoginUtilisateurTable.setCellValueFactory(new PropertyValueFactory<>("login"));
         colRoleUtilisateurTable.setCellValueFactory(cellData -> new SimpleStringProperty(
-                cellData.getValue().getRole() != null ? cellData.getValue().getRole().getDbValue() : "N/A"
+                cellData.getValue().getRole() != null ? cellData.getValue().getRole().getLibelleInterface() : "N/A"
         ));
         colPersonnelAssocieTable.setCellValueFactory(new PropertyValueFactory<>("nomPersonnelAssocie"));
-        CONTROLEUR_USER_LOGGER.fine("Colonnes de la table des utilisateurs configurées.");
+        CONTROLEUR_UTILISATEUR_LOGGER.fine("Colonnes de la table des utilisateurs configurées.");
     }
 
     private void chargerOptionsFiltresUtilisateurs() {
         ObservableList<RoleUtilisateur> roles = FXCollections.observableArrayList(RoleUtilisateur.values());
-        roles.add(0, null); // Option "Tous les rôles"
+        roles.add(0, null);
         choiceBoxFiltreRoleUtilisateur.setItems(roles);
         choiceBoxFiltreRoleUtilisateur.setConverter(new StringConverter<RoleUtilisateur>() {
-            @Override public String toString(RoleUtilisateur role) { return role == null ? "Tous les rôles" : role.getDbValue(); }
-            @Override public RoleUtilisateur fromString(String string) { return "Tous les rôles".equals(string) ? null : RoleUtilisateur.fromDbValue(string); }
+            @Override public String toString(RoleUtilisateur role) { return role == null ? "Tous les rôles" : role.getLibelleInterface(); }
+            @Override public RoleUtilisateur fromString(String string) {
+                if ("Tous les rôles".equals(string) || string == null) return null;
+                return Arrays.stream(RoleUtilisateur.values()).filter(r -> r.getLibelleInterface().equals(string)).findFirst().orElse(null);
+            }
         });
         choiceBoxFiltreRoleUtilisateur.setValue(null);
-        CONTROLEUR_USER_LOGGER.fine("Options du filtre par rôle utilisateur chargées.");
+        CONTROLEUR_UTILISATEUR_LOGGER.fine("Options des filtres pour la liste des utilisateurs chargées.");
     }
 
     private void configurerPermissionsActionsUtilisateurs() {
-        // Les permissions granulaires (créer, modifier, supprimer user) sont vérifiées ici pour activer/désactiver les boutons
-        RoleUtilisateur roleActuel = SessionManager.obtenirRoleUtilisateurActuel();
-        if (boutonCreerUtilisateur != null) boutonCreerUtilisateur.setDisable(!gestionnaireSecurite.estAutorise(roleActuel, Permissions.UTILISATEUR_CREER_COMPTE));
-        // Les autres sont contextuels et vérifiés dans configurerEtatBoutonsContextuelsUtilisateurs
+        RoleUtilisateur roleConnecte = SessionManager.obtenirRoleUtilisateurActuel();
+        boolean estAdmin = roleConnecte == RoleUtilisateur.U4 && gestionnaireSecurite.estAutorise(roleConnecte, Permissions.UTILISATEUR_GERER_COMPTES);
+        if (boutonCreerUtilisateur != null) boutonCreerUtilisateur.setDisable(!estAdmin);
+        configurerEtatBoutonsContextuelsUtilisateurs(null);
     }
 
     private void configurerEtatBoutonsContextuelsUtilisateurs(UtilisateurDTO utilisateurSelectionne) {
         boolean aucuneSelection = utilisateurSelectionne == null;
-        RoleUtilisateur roleActuel = SessionManager.obtenirRoleUtilisateurActuel();
+        RoleUtilisateur roleConnecte = SessionManager.obtenirRoleUtilisateurActuel();
+        boolean estAdmin = roleConnecte == RoleUtilisateur.U4 && gestionnaireSecurite.estAutorise(roleConnecte, Permissions.UTILISATEUR_GERER_COMPTES);
 
-        if (boutonModifierUtilisateur != null) {
-            boutonModifierUtilisateur.setDisable(aucuneSelection || !gestionnaireSecurite.estAutorise(roleActuel, Permissions.UTILISATEUR_MODIFIER_COMPTE));
-        }
-        if (boutonReinitialiserMotDePasse != null) {
-            boutonReinitialiserMotDePasse.setDisable(aucuneSelection || !gestionnaireSecurite.estAutorise(roleActuel, Permissions.UTILISATEUR_MODIFIER_COMPTE)); // Même permission que modifier pour simplifier
-        }
+        if (boutonModifierUtilisateur != null) boutonModifierUtilisateur.setDisable(aucuneSelection || !estAdmin);
         if (boutonSupprimerUtilisateur != null) {
-            boolean peutSupprimer = !aucuneSelection && gestionnaireSecurite.estAutorise(roleActuel, Permissions.UTILISATEUR_SUPPRIMER_COMPTE);
-            // Empêcher la suppression de son propre compte admin
-            if (peutSupprimer && utilisateurSelectionne.getId() == SessionManager.obtenirUtilisateurActuel().getId()) {
-                peutSupprimer = false;
-            }
+            boolean peutSupprimer = estAdmin && !aucuneSelection &&
+                    (utilisateurSelectionne.getId() != SessionManager.obtenirUtilisateurActuel().getId());
             boutonSupprimerUtilisateur.setDisable(!peutSupprimer);
         }
+        if (boutonReinitialiserMotDePasse != null) boutonReinitialiserMotDePasse.setDisable(aucuneSelection || !estAdmin);
     }
 
     @FXML
     public void actionActualiserListeUtilisateurs() {
-        CONTROLEUR_USER_LOGGER.info("Actualisation de la liste des utilisateurs.");
+        CONTROLEUR_UTILISATEUR_LOGGER.info("Tentative d'actualisation de la liste des utilisateurs.");
         try {
-            String loginRecherche = champRechercheLoginUtilisateur.getText();
-            RoleUtilisateur roleFiltre = choiceBoxFiltreRoleUtilisateur.getValue();
+            String rechercheLogin = champRechercheLoginUtilisateur.getText();
+            RoleUtilisateur filtreRole = choiceBoxFiltreRoleUtilisateur.getValue();
 
-            List<Utilisateur> utilisateursModel = serviceLogiqueMetier.rechercherUtilisateurs(loginRecherche, roleFiltre);
+            List<Utilisateur> utilisateursModel = serviceLogiqueMetier.rechercherUtilisateursFiltres(rechercheLogin, filtreRole);
             List<UtilisateurDTO> utilisateursDto = DataMapper.convertirVersListeDeUtilisateurDTO(utilisateursModel, servicePersistance);
             tableVueUtilisateurs.setItems(FXCollections.observableArrayList(utilisateursDto));
             tableVueUtilisateurs.refresh();
             configurerEtatBoutonsContextuelsUtilisateurs(null);
-            CONTROLEUR_USER_LOGGER.info(utilisateursDto.size() + " utilisateurs chargés.");
+            CONTROLEUR_UTILISATEUR_LOGGER.info(utilisateursDto.size() + " utilisateurs chargés et affichés.");
         } catch (Exception e) {
-            CONTROLEUR_USER_LOGGER.log(Level.SEVERE, "Erreur lors de l'actualisation des utilisateurs.", e);
-            afficherNotificationAlerteInterface("Erreur Données Utilisateurs", "Impossible de charger la liste : " + e.getMessage(), Alert.AlertType.ERROR);
+            CONTROLEUR_UTILISATEUR_LOGGER.log(Level.SEVERE, "Erreur lors de l'actualisation des utilisateurs.", e);
+            afficherNotificationAlerteInterface("Erreur de Données", "Impossible de charger la liste des utilisateurs : " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
     @FXML
     private void actionOuvrirFormulaireCreationUtilisateur() {
-        CONTROLEUR_USER_LOGGER.fine("Action : ouvrir formulaire de création d'utilisateur.");
+        CONTROLEUR_UTILISATEUR_LOGGER.fine("Action utilisateur : ouvrir formulaire de création d'utilisateur.");
         ouvrirDialogueFormulaireUtilisateur(null);
     }
 
@@ -168,10 +165,10 @@ public class UserManagementPanelController implements ViewController.Initializab
             afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un utilisateur à modifier.", Alert.AlertType.INFORMATION);
             return;
         }
-        CONTROLEUR_USER_LOGGER.fine("Action : ouvrir formulaire de modification pour utilisateur ID: " + utilisateurSelectionneDto.getId());
+        CONTROLEUR_UTILISATEUR_LOGGER.fine("Action utilisateur : ouvrir formulaire de modification pour utilisateur ID: " + utilisateurSelectionneDto.getId());
         Utilisateur utilisateurModel = servicePersistance.trouverUtilisateurParId(utilisateurSelectionneDto.getId());
         if (utilisateurModel == null){
-            afficherNotificationAlerteInterface("Donnée Introuvable", "L'utilisateur sélectionné (ID: "+utilisateurSelectionneDto.getId()+") n'a pas été retrouvé.", Alert.AlertType.ERROR);
+            afficherNotificationAlerteInterface("Erreur Donnée Introuvable", "L'utilisateur sélectionné (ID: "+utilisateurSelectionneDto.getId()+") n'a pas pu être retrouvé.", Alert.AlertType.ERROR);
             actionActualiserListeUtilisateurs();
             return;
         }
@@ -180,8 +177,8 @@ public class UserManagementPanelController implements ViewController.Initializab
 
     private void ouvrirDialogueFormulaireUtilisateur(Utilisateur utilisateurAEditer) {
         try {
-            String titreDialogue = (utilisateurAEditer == null) ? "Créer un Nouveau Compte Utilisateur" : "Modifier l'Utilisateur : " + utilisateurAEditer.getLogin();
-            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireUtilisateurView.fxml"; // FXML à créer
+            String titreDialogue = (utilisateurAEditer == null) ? "Créer un Nouvel Utilisateur" : "Modifier l'Utilisateur : " + utilisateurAEditer.getLogin();
+            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireUtilisateurView.fxml";
             URL urlFxml = getClass().getResource(cheminFxmlFormulaire);
             if (urlFxml == null) throw new IOException("Fichier FXML du formulaire utilisateur introuvable: " + cheminFxmlFormulaire);
 
@@ -204,11 +201,36 @@ public class UserManagementPanelController implements ViewController.Initializab
 
             stageDialogue.showAndWait();
             actionActualiserListeUtilisateurs();
-            CONTROLEUR_USER_LOGGER.info("Dialogue du formulaire utilisateur fermé.");
+            CONTROLEUR_UTILISATEUR_LOGGER.info("Dialogue du formulaire utilisateur fermé.");
 
         } catch (IOException e) {
-            CONTROLEUR_USER_LOGGER.log(Level.SEVERE, "Erreur critique lors de l'ouverture du formulaire utilisateur.", e);
+            CONTROLEUR_UTILISATEUR_LOGGER.log(Level.SEVERE, "Erreur critique lors de l'ouverture du formulaire utilisateur.", e);
             afficherNotificationAlerteInterface("Erreur d'Interface Majeure", "Impossible d'ouvrir le formulaire : " + e.getMessage(), Alert.AlertType.ERROR);
+        }
+    }
+
+    @FXML
+    private void actionSupprimerUtilisateurSelectionne() {
+        UtilisateurDTO utilisateurSelectionne = tableVueUtilisateurs.getSelectionModel().getSelectedItem();
+        if (utilisateurSelectionne == null) {
+            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un utilisateur à supprimer.", Alert.AlertType.INFORMATION);
+            return;
+        }
+        if (utilisateurSelectionne.getId() == SessionManager.obtenirUtilisateurActuel().getId()) {
+            afficherNotificationAlerteInterface("Action Interdite", "Vous ne pouvez pas supprimer votre propre compte utilisateur.", Alert.AlertType.WARNING);
+            return;
+        }
+
+        Optional<ButtonType> reponse = afficherDialogueConfirmationInterface("Confirmation de Suppression",
+                "Êtes-vous sûr de vouloir supprimer l'utilisateur '" + utilisateurSelectionne.getLogin() + "' ? Cette action est irréversible.", ButtonType.YES, ButtonType.NO);
+        if (reponse.isPresent() && reponse.get() == ButtonType.YES) {
+            try {
+                serviceLogiqueMetier.supprimerUtilisateur(utilisateurSelectionne.getId());
+                actionActualiserListeUtilisateurs();
+                afficherNotificationAlerteInterface("Suppression Réussie", "L'utilisateur a été supprimé.", Alert.AlertType.INFORMATION);
+            } catch (ErreurLogiqueMetier | ErreurBaseDeDonnees e) {
+                afficherNotificationAlerteInterface("Échec de Suppression", e.getMessage(), Alert.AlertType.ERROR);
+            }
         }
     }
 
@@ -220,51 +242,63 @@ public class UserManagementPanelController implements ViewController.Initializab
             return;
         }
 
-        TextInputDialog dialogueNouveauMotDePasse = new TextInputDialog();
-        dialogueNouveauMotDePasse.setTitle("Réinitialisation du Mot de Passe");
-        dialogueNouveauMotDePasse.setHeaderText("Entrez le nouveau mot de passe pour l'utilisateur : " + utilisateurSelectionne.getLogin());
-        dialogueNouveauMotDePasse.setContentText("Nouveau mot de passe :");
+        Dialog<String> dialogueNouveauMdp = new Dialog<>();
+        dialogueNouveauMdp.setTitle("Réinitialiser Mot de Passe");
+        dialogueNouveauMdp.setHeaderText("Nouveau mot de passe pour l'utilisateur : " + utilisateurSelectionne.getLogin());
         Stage stageProprietaire = MainApp.getPrimaryStage();
-        if (stageProprietaire != null) dialogueNouveauMotDePasse.initOwner(stageProprietaire);
+        if (stageProprietaire != null) dialogueNouveauMdp.initOwner(stageProprietaire);
 
-        Optional<String> resultat = dialogueNouveauMotDePasse.showAndWait();
-        resultat.ifPresent(nouveauMdp -> {
-            if (nouveauMdp.trim().isEmpty()) {
-                afficherNotificationAlerteInterface("Mot de Passe Vide", "Le nouveau mot de passe ne peut pas être vide.", Alert.AlertType.WARNING);
-                return;
+        GridPane grille = new GridPane();
+        grille.setHgap(10);
+        grille.setVgap(10);
+        PasswordField champNouveauMdp = new PasswordField();
+        champNouveauMdp.setPromptText("Nouveau mot de passe");
+        PasswordField champConfirmationMdp = new PasswordField();
+        champConfirmationMdp.setPromptText("Confirmer le mot de passe");
+
+        grille.add(new Label("Nouveau mot de passe:"), 0, 0);
+        grille.add(champNouveauMdp, 1, 0);
+        grille.add(new Label("Confirmer:"), 0, 1);
+        grille.add(champConfirmationMdp, 1, 1);
+        dialogueNouveauMdp.getDialogPane().setContent(grille);
+
+        ButtonType boutonConfirmerReinit = new ButtonType("Réinitialiser", ButtonBar.ButtonData.OK_DONE);
+        dialogueNouveauMdp.getDialogPane().getButtonTypes().addAll(boutonConfirmerReinit, ButtonType.CANCEL);
+
+        final Button boutonOk = (Button) dialogueNouveauMdp.getDialogPane().lookupButton(boutonConfirmerReinit);
+        boutonOk.setDisable(true);
+
+        Runnable validerEtActiverBouton = () -> {
+            String mdp1 = champNouveauMdp.getText();
+            String mdp2 = champConfirmationMdp.getText();
+            boutonOk.setDisable(mdp1.trim().isEmpty() || !mdp1.equals(mdp2));
+        };
+        champNouveauMdp.textProperty().addListener((observable, oldValue, newValue) -> validerEtActiverBouton.run());
+        champConfirmationMdp.textProperty().addListener((observable, oldValue, newValue) -> validerEtActiverBouton.run());
+
+
+        dialogueNouveauMdp.setResultConverter(typeBouton -> {
+            if (typeBouton == boutonConfirmerReinit) {
+                String mdp1 = champNouveauMdp.getText();
+                // La validation est déjà faite par le listener du bouton, mais on peut la redoubler ici par sécurité
+                if (mdp1.isEmpty() || !mdp1.equals(champConfirmationMdp.getText())) {
+                    afficherNotificationAlerteInterface("Erreur de Saisie", "Les mots de passe ne correspondent pas ou sont vides.", Alert.AlertType.WARNING);
+                    return null;
+                }
+                return mdp1;
             }
+            return null;
+        });
+
+        Optional<String> resultat = dialogueNouveauMdp.showAndWait();
+        resultat.ifPresent(nouveauMdp -> {
             try {
-                serviceLogiqueMetier.modifierMotDePasseUtilisateur(utilisateurSelectionne.getId(), nouveauMdp);
+                serviceLogiqueMetier.reinitialiserMotDePasseUtilisateur(utilisateurSelectionne.getId(), nouveauMdp);
                 afficherNotificationAlerteInterface("Mot de Passe Réinitialisé", "Le mot de passe pour " + utilisateurSelectionne.getLogin() + " a été mis à jour.", Alert.AlertType.INFORMATION);
             } catch (ErreurValidation | ErreurLogiqueMetier e) {
                 afficherNotificationAlerteInterface("Échec Réinitialisation", e.getMessage(), Alert.AlertType.ERROR);
             }
         });
-    }
-
-    @FXML
-    private void actionSupprimerUtilisateurSelectionne() {
-        UtilisateurDTO utilisateurSelectionne = tableVueUtilisateurs.getSelectionModel().getSelectedItem();
-        if (utilisateurSelectionne == null) {
-            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un utilisateur à supprimer.", Alert.AlertType.INFORMATION);
-            return;
-        }
-        if (utilisateurSelectionne.getId() == SessionManager.obtenirUtilisateurActuel().getId()) {
-            afficherNotificationAlerteInterface("Action Interdite", "Vous ne pouvez pas supprimer votre propre compte administrateur.", Alert.AlertType.WARNING);
-            return;
-        }
-
-        Optional<ButtonType> reponse = afficherDialogueConfirmationInterface("Confirmation de Suppression",
-                "Êtes-vous sûr de vouloir supprimer l'utilisateur '" + utilisateurSelectionne.getLogin() + "' ? Cette action est irréversible.");
-        if (reponse.isPresent() && reponse.get() == ButtonType.OK) {
-            try {
-                serviceLogiqueMetier.supprimerUtilisateur(utilisateurSelectionne.getId()); // Méthode à créer
-                actionActualiserListeUtilisateurs();
-                afficherNotificationAlerteInterface("Suppression Réussie", "L'utilisateur a été supprimé.", Alert.AlertType.INFORMATION);
-            } catch (ErreurLogiqueMetier e) {
-                afficherNotificationAlerteInterface("Échec de Suppression", e.getMessage(), Alert.AlertType.ERROR);
-            }
-        }
     }
 
     private void afficherNotificationAlerteInterface(String titre, String message, Alert.AlertType typeAlerte) {
@@ -279,55 +313,18 @@ public class UserManagementPanelController implements ViewController.Initializab
         alerte.showAndWait();
     }
 
-    private Optional<ButtonType> afficherDialogueConfirmationInterface(String titre, String message) {
+    private Optional<ButtonType> afficherDialogueConfirmationInterface(String titre, String message, ButtonType... buttonTypes) {
         Alert dialogue = new Alert(Alert.AlertType.CONFIRMATION);
         dialogue.setTitle(titre);
         dialogue.setHeaderText(null);
         dialogue.setContentText(message);
+        if (buttonTypes != null && buttonTypes.length > 0) {
+            dialogue.getButtonTypes().setAll(buttonTypes);
+        }
         Stage stagePrincipal = MainApp.getPrimaryStage();
         if (stagePrincipal != null && stagePrincipal.getScene() != null && stagePrincipal.isShowing()) {
             dialogue.initOwner(stagePrincipal);
         }
         return dialogue.showAndWait();
-    }
-
-    // Classe interne TextInputDialog si non disponible ou pour personnalisation
-    // JavaFX fournit javafx.scene.control.TextInputDialog
-    private static class TextInputDialog extends Dialog<String> {
-        private PasswordField champMotDePasse; // Utiliser PasswordField pour la saisie de MDP
-
-        public TextInputDialog() {
-            this("");
-        }
-
-        public TextInputDialog(String defaultValue) {
-            final DialogPane dialogPane = getDialogPane();
-
-            this.champMotDePasse = new PasswordField();
-            this.champMotDePasse.setText(defaultValue);
-
-            dialogPane.setContentText("Nouveau mot de passe:"); // Ce texte n'est pas utilisé si setContent est appelé
-
-            GridPane content = new GridPane();
-            content.setHgap(10);
-            content.setVgap(5);
-            content.add(new Label("Nouveau mot de passe:"),0,0);
-            content.add(this.champMotDePasse,1,0);
-            dialogPane.setContent(content);
-
-
-            setTitle("Saisie");
-            dialogPane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-            Platform.runLater(() -> champMotDePasse.requestFocus());
-
-            setResultConverter(dialogButton -> {
-                ButtonType. όταν(dialogButton.getButtonData()).isEqualTo(ButtonBar.ButtonData.OK_DONE);
-                if (dialogButton == ButtonType.OK) {
-                    return champMotDePasse.getText();
-                }
-                return null;
-            });
-        }
     }
 }

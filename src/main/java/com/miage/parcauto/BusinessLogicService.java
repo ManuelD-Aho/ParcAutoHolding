@@ -18,7 +18,7 @@ import java.nio.file.StandardCopyOption;
 
 public class BusinessLogicService {
     private final PersistenceService persistenceService;
-    private final SecurityManager securityManager; // Changé pour correspondre à l'instanciation
+    private final SecurityManager securityManager;
     private static final Logger BUSINESS_LOGGER = Logger.getLogger(BusinessLogicService.class.getName());
     private static final String DOSSIER_BASE_DOCUMENTS = "documents_societaires_parcauto";
 
@@ -65,7 +65,6 @@ public class BusinessLogicService {
             if (vExistant != null) vehicule.setDateEtat(vExistant.getDateEtat());
             else vehicule.setDateEtat(LocalDateTime.now());
         }
-
 
         return persistenceService.sauvegarderVehicule(vehicule);
     }
@@ -188,7 +187,6 @@ public class BusinessLogicService {
             throw new ErreurLogiqueMetier("Seules les missions planifiées peuvent être modifiées. Statut actuel: " + missionExistante.getStatus().getDbValue());
         }
         validerDonneesMission(mission, false);
-
         return persistenceService.sauvegarderMission(mission);
     }
 
@@ -213,7 +211,6 @@ public class BusinessLogicService {
         persistenceService.supprimerMissionParId(idMission);
         BUSINESS_LOGGER.info("Mission ID " + idMission + " annulée.");
     }
-
 
     private void validerDonneesMission(Mission mission, boolean estNouvelle) throws ErreurValidation {
         if (mission.getLibMission() == null || mission.getLibMission().trim().isEmpty()) {
@@ -268,8 +265,6 @@ public class BusinessLogicService {
         mission.setDateFinMission(LocalDateTime.now());
         mission.setStatus(StatutMission.CLOTUREE);
 
-        persistenceService.supprimerToutesDepensesPourMission(idMission); // Supprimer les anciennes avant d'ajouter les nouvelles
-
         BigDecimal coutDepenses = BigDecimal.ZERO;
         if (depenses != null && !depenses.isEmpty()) {
             for (DepenseMission depense : depenses) {
@@ -289,7 +284,7 @@ public class BusinessLogicService {
 
         Mission missionCloturee = persistenceService.sauvegarderMission(mission);
 
-        vehicule.setKmActuels(vehicule.getKmActuels() != null ? vehicule.getKmActuels() + kmReel : kmReel); // Mise à jour cumulative
+        vehicule.setKmActuels(kmReel);
         EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
         if (etatDisponible != null) {
             changerEtatVehicule(vehicule.getIdVehicule(), etatDisponible.getIdEtatVoiture(), LocalDateTime.now());
@@ -300,7 +295,6 @@ public class BusinessLogicService {
 
         return missionCloturee;
     }
-
 
     public Entretien creerNouvelEntretien(Entretien entretien) throws ErreurValidation, ErreurBaseDeDonnees {
         Objects.requireNonNull(entretien, "L'objet Entretien ne peut être nul.");
@@ -355,7 +349,7 @@ public class BusinessLogicService {
         return entretienModifie;
     }
 
-    public Entretien changerStatutOrdreTravail(int idEntretien, StatutOrdreTravail nouveauStatut) throws ErreurLogiqueMetier, ErreurBaseDeDonnees, ErreurValidation {
+    public Entretien changerStatutOrdreTravail(int idEntretien, StatutOrdreTravail nouveauStatut) throws ErreurLogiqueMetier, ErreurBaseDeDonnees {
         Entretien entretien = persistenceService.trouverEntretienParId(idEntretien);
         if (entretien == null) {
             throw new ErreurLogiqueMetier("Entretien ID " + idEntretien + " non trouvé.");
@@ -367,6 +361,25 @@ public class BusinessLogicService {
         return modifierEntretien(entretien);
     }
 
+    public void supprimerEntretien(int idEntretien) throws ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Entretien entretienASupprimer = persistenceService.trouverEntretienParId(idEntretien);
+        if (entretienASupprimer == null) {
+            throw new ErreurLogiqueMetier("L'entretien avec l'ID " + idEntretien + " n'existe pas et ne peut être supprimé.");
+        }
+        if (entretienASupprimer.getStatutOt() != StatutOrdreTravail.CLOTURE && entretienASupprimer.getDateSortieEntr() == null) {
+            Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(entretienASupprimer.getIdVehicule());
+            if (vehiculeConcerne != null) {
+                EtatVoiture etatEnEntretien = persistenceService.trouverEtatVoitureParLibelle("En entretien");
+                if (etatEnEntretien != null && vehiculeConcerne.getIdEtatVoiture() == etatEnEntretien.getIdEtatVoiture()) {
+                    EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
+                    if (etatDisponible != null) {
+                        changerEtatVehicule(vehiculeConcerne.getIdVehicule(), etatDisponible.getIdEtatVoiture(), LocalDateTime.now());
+                    }
+                }
+            }
+        }
+        persistenceService.supprimerEntretienParId(idEntretien);
+    }
 
     private void validerDonneesEntretien(Entretien entretien) throws ErreurValidation {
         if (entretien.getIdVehicule() == 0) {
@@ -509,7 +522,7 @@ public class BusinessLogicService {
             throw new ErreurLogiqueMetier("Document ID " + idDoc + " non trouvé.");
         }
         if (!Objects.equals(cheminFichierStocke, doc.getCheminFichier())) {
-            BUSINESS_LOGGER.warning("Tentative de suppression de document ID " + idDoc + " avec un chemin de fichier (" + cheminFichierStocke + ") qui ne correspond pas à celui en BDD (" + doc.getCheminFichier() + "). Suppression du fichier physique annulée.");
+            BUSINESS_LOGGER.warning("Tentative de suppression de document ID " + idDoc + " avec un chemin de fichier (" + cheminFichierStocke + ") qui ne correspond pas à celui en BDD (" + doc.getCheminFichier() + "). Suppression du fichier annulée.");
         } else {
             Path cheminFichier = Paths.get(cheminFichierStocke);
             if (Files.exists(cheminFichier)) {
@@ -522,7 +535,6 @@ public class BusinessLogicService {
         persistenceService.supprimerDocumentSocietaireParId(idDoc);
         BUSINESS_LOGGER.info("Document ID " + idDoc + " supprimé de la base de données.");
     }
-
 
     public Utilisateur creerNouvelUtilisateur(Utilisateur utilisateur, String motDePasseClair) throws ErreurValidation, ErreurBaseDeDonnees {
         Objects.requireNonNull(utilisateur, "L'objet Utilisateur ne peut être nul.");
@@ -538,7 +550,7 @@ public class BusinessLogicService {
             throw new ErreurValidation("Le personnel associé (ID: " + utilisateur.getIdPersonnel() + ") n'existe pas.");
         }
 
-        utilisateur.setHashMdp(securityManager.genererHashMotDePasse(motDePasseClair));
+        utilisateur.setHashMdp(this.securityManager.genererHashMotDePasse(motDePasseClair));
         return persistenceService.sauvegarderUtilisateur(utilisateur);
     }
 
@@ -547,11 +559,14 @@ public class BusinessLogicService {
         if (utilisateur.getId() == 0) {
             throw new ErreurValidation("L'ID de l'utilisateur est requis pour la modification.");
         }
+
         Utilisateur utilisateurExistant = persistenceService.trouverUtilisateurParId(utilisateur.getId());
         if (utilisateurExistant == null) {
             throw new ErreurLogiqueMetier("Utilisateur ID " + utilisateur.getId() + " non trouvé.");
         }
+
         utilisateur.setLogin(utilisateurExistant.getLogin());
+
         validerDonneesUtilisateur(utilisateur);
 
         if (utilisateur.getIdPersonnel() != null && persistenceService.trouverPersonnelParId(utilisateur.getIdPersonnel()) == null) {
@@ -559,7 +574,7 @@ public class BusinessLogicService {
         }
 
         if (nouveauMotDePasseClairOptionnel != null && !nouveauMotDePasseClairOptionnel.trim().isEmpty()) {
-            utilisateur.setHashMdp(securityManager.genererHashMotDePasse(nouveauMotDePasseClairOptionnel));
+            utilisateur.setHashMdp(this.securityManager.genererHashMotDePasse(nouveauMotDePasseClairOptionnel));
         } else {
             utilisateur.setHashMdp(utilisateurExistant.getHashMdp());
         }
@@ -574,11 +589,24 @@ public class BusinessLogicService {
         if (nouveauMotDePasseClair == null || nouveauMotDePasseClair.trim().isEmpty()) {
             throw new ErreurValidation("Le nouveau mot de passe ne peut pas être vide.");
         }
-        utilisateur.setHashMdp(securityManager.genererHashMotDePasse(nouveauMotDePasseClair));
+        utilisateur.setHashMdp(this.securityManager.genererHashMotDePasse(nouveauMotDePasseClair));
         persistenceService.sauvegarderUtilisateur(utilisateur);
         BUSINESS_LOGGER.info("Mot de passe réinitialisé pour l'utilisateur ID " + idUtilisateur);
     }
 
+    public void supprimerUtilisateur(int idUtilisateur) throws ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Utilisateur utilisateurASupprimer = persistenceService.trouverUtilisateurParId(idUtilisateur);
+        if (utilisateurASupprimer == null) {
+            throw new ErreurLogiqueMetier("L'utilisateur avec l'ID " + idUtilisateur + " n'existe pas.");
+        }
+        if (utilisateurASupprimer.getRole() == RoleUtilisateur.U4) {
+            List<Utilisateur> admins = persistenceService.trouverUtilisateursParRole(RoleUtilisateur.U4);
+            if (admins.size() <= 1) {
+                throw new ErreurLogiqueMetier("Impossible de supprimer le dernier administrateur système.");
+            }
+        }
+        persistenceService.supprimerUtilisateurParId(idUtilisateur);
+    }
 
     private void validerDonneesUtilisateur(Utilisateur utilisateur) throws ErreurValidation {
         if (utilisateur.getLogin() == null || utilisateur.getLogin().trim().isEmpty()) {
@@ -626,7 +654,7 @@ public class BusinessLogicService {
             Utilisateur u = persistenceService.trouverUtilisateurParLogin(login);
             return u != null ? List.of(u) : List.of();
         } else if (role != null) {
-            return persistenceService.trouverUtilisateursParRole(role); // Appel à la méthode maintenant existante
+            return persistenceService.trouverUtilisateursParRole(role);
         } else {
             return persistenceService.trouverTousLesUtilisateurs();
         }

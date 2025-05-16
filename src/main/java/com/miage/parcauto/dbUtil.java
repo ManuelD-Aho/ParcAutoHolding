@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -12,61 +13,55 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class dbUtil {
-
-    private static final Logger LOGGER = Logger.getLogger(dbUtil.class.getName());
-    private static final Properties dbProperties = new Properties();
-    private static final String DB_PROPERTIES_FILE = "db.properties";
+    private static final Properties properties = new Properties();
+    // Le fichier est maintenant attendu dans le même package que dbUtil.class
+    private static final String DB_PROPERTIES_FILE_NAME = "db.properties";
+    private static final Logger DB_UTIL_LOGGER = Logger.getLogger(dbUtil.class.getName());
 
     static {
-        try (InputStream input = dbUtil.class.getClassLoader().getResourceAsStream(DB_PROPERTIES_FILE)) {
+        // Utilisation d'un chemin relatif au package de la classe dbUtil
+        try (InputStream input = dbUtil.class.getResourceAsStream(DB_PROPERTIES_FILE_NAME)) {
             if (input == null) {
-                LOGGER.log(Level.SEVERE, "Impossible de trouver le fichier " + DB_PROPERTIES_FILE + " dans le classpath (src/main/resources).");
-                throw new IOException("Fichier de configuration " + DB_PROPERTIES_FILE + " non trouvé.");
+                DB_UTIL_LOGGER.log(Level.SEVERE, "Impossible de trouver le fichier '" + DB_PROPERTIES_FILE_NAME + "' dans le package 'main.java.com.miage.parcauto'.");
+                DB_UTIL_LOGGER.log(Level.SEVERE, "Vérifiez que '" + DB_PROPERTIES_FILE_NAME + "' est présent dans 'src/main/java/com/miage/parcauto/' et que les fichiers .properties sont copiés dans le classpath lors de la compilation.");
+                throw new IOException("Fichier de configuration '" + DB_PROPERTIES_FILE_NAME + "' non trouvé dans le package de la classe dbUtil.");
             }
-            dbProperties.load(input);
+            properties.load(input);
+            DB_UTIL_LOGGER.info("Fichier de configuration de la base de données '" + DB_PROPERTIES_FILE_NAME + "' chargé avec succès depuis le package.");
 
-            String driver = dbProperties.getProperty("db.driver");
-            if (driver == null || driver.trim().isEmpty()) {
-                LOGGER.log(Level.SEVERE, "La propriété 'db.driver' est manquante dans " + DB_PROPERTIES_FILE);
-                throw new RuntimeException("Configuration du driver JDBC manquante.");
-            }
-            Class.forName(driver);
-            LOGGER.info("Driver JDBC MySQL chargé avec succès: " + driver);
-
+            Class.forName(properties.getProperty("db.driver"));
+            DB_UTIL_LOGGER.info("Driver JDBC chargé : " + properties.getProperty("db.driver"));
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE, "Erreur lors du chargement du fichier " + DB_PROPERTIES_FILE + ": " + e.getMessage(), e);
+            DB_UTIL_LOGGER.log(Level.SEVERE, "Erreur lors du chargement du fichier '" + DB_PROPERTIES_FILE_NAME + "': " + e.getMessage());
             throw new RuntimeException("Impossible de charger la configuration de la base de données.", e);
         } catch (ClassNotFoundException e) {
-            LOGGER.log(Level.SEVERE, "Driver JDBC MySQL non trouvé: " + e.getMessage(), e);
-            throw new RuntimeException("Driver JDBC MySQL non trouvé.", e);
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Erreur inattendue lors de l'initialisation de DbUtil: " + e.getMessage(), e);
-            throw new RuntimeException("Erreur d'initialisation de DbUtil.", e);
+            DB_UTIL_LOGGER.log(Level.SEVERE, "Driver JDBC non trouvé: " + properties.getProperty("db.driver"), e);
+            throw new RuntimeException("Driver JDBC introuvable.", e);
         }
     }
 
     public static Connection getConnection() throws SQLException {
-        String url = dbProperties.getProperty("db.url");
-        String user = dbProperties.getProperty("db.username");
-        String pass = dbProperties.getProperty("db.password");
-
-        if (url == null || url.trim().isEmpty() ||
-                user == null || user.trim().isEmpty() ||
-                pass == null) { // Le mot de passe peut être vide, mais la clé doit exister
-            LOGGER.log(Level.SEVERE, "Les propriétés de connexion (db.url, db.username, db.password) sont manquantes ou incomplètes dans " + DB_PROPERTIES_FILE);
-            throw new SQLException("Configuration de la base de données incomplète.");
+        try {
+            Connection conn = DriverManager.getConnection(
+                    properties.getProperty("db.url"),
+                    properties.getProperty("db.username"),
+                    properties.getProperty("db.password")
+            );
+            DB_UTIL_LOGGER.fine("Connexion à la base de données établie.");
+            return conn;
+        } catch (SQLException e) {
+            DB_UTIL_LOGGER.log(Level.SEVERE, "Échec de la connexion à la base de données. URL: " + properties.getProperty("db.url") + ", Utilisateur: " + properties.getProperty("db.username"), e);
+            throw new SQLException("Impossible d'établir la connexion à la base de données : " + e.getMessage(), e);
         }
-        return DriverManager.getConnection(url, user, pass);
     }
 
     public static void close(Connection connection) {
         if (connection != null) {
             try {
-                if (!connection.isClosed()) {
-                    connection.close();
-                }
+                connection.close();
+                DB_UTIL_LOGGER.fine("Connexion à la base de données fermée.");
             } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la fermeture de la connexion JDBC: " + e.getMessage(), e);
+                DB_UTIL_LOGGER.log(Level.WARNING, "Erreur lors de la fermeture de la connexion.", e);
             }
         }
     }
@@ -74,11 +69,21 @@ public class dbUtil {
     public static void close(Statement statement) {
         if (statement != null) {
             try {
-                if (!statement.isClosed()) {
-                    statement.close();
-                }
+                statement.close();
+                DB_UTIL_LOGGER.finest("Statement fermé.");
             } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du Statement JDBC: " + e.getMessage(), e);
+                DB_UTIL_LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du Statement.", e);
+            }
+        }
+    }
+
+    public static void close(PreparedStatement preparedStatement) {
+        if (preparedStatement != null) {
+            try {
+                preparedStatement.close();
+                DB_UTIL_LOGGER.finest("PreparedStatement fermé.");
+            } catch (SQLException e) {
+                DB_UTIL_LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du PreparedStatement.", e);
             }
         }
     }
@@ -86,34 +91,27 @@ public class dbUtil {
     public static void close(ResultSet resultSet) {
         if (resultSet != null) {
             try {
-                if (!resultSet.isClosed()) {
-                    resultSet.close();
-                }
+                resultSet.close();
+                DB_UTIL_LOGGER.finest("ResultSet fermé.");
             } catch (SQLException e) {
-                LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du ResultSet JDBC: " + e.getMessage(), e);
+                DB_UTIL_LOGGER.log(Level.WARNING, "Erreur lors de la fermeture du ResultSet.", e);
             }
         }
     }
 
-    public static void closeQuietly(Connection conn, Statement stmt, ResultSet rs) {
-        try {
-            if (rs != null && !rs.isClosed()) rs.close();
-        } catch (SQLException e) {
-            LOGGER.log(Level.WARNING, "Erreur silencieuse lors de la fermeture du ResultSet: " + e.getMessage());
-        }
-        try {
-            if (stmt != null && !stmt.isClosed()) stmt.close();
-        } catch (SQLException e) {
-            LOGGER.log(Level.WARNING, "Erreur silencieuse lors de la fermeture du Statement: " + e.getMessage());
-        }
-        try {
-            if (conn != null && !conn.isClosed()) conn.close();
-        } catch (SQLException e) {
-            LOGGER.log(Level.WARNING, "Erreur silencieuse lors de la fermeture de la Connexion: " + e.getMessage());
-        }
+    public static void close(Connection conn, Statement stmt, ResultSet rs) {
+        close(rs);
+        close(stmt);
+        close(conn);
     }
 
-    public static void closeQuietly(Connection conn, Statement stmt) {
-        closeQuietly(conn, stmt, null);
+    public static void close(Connection conn, PreparedStatement pstmt, ResultSet rs) {
+        close(rs);
+        close(pstmt);
+        close(conn);
+    }
+    public static void close(Connection conn, PreparedStatement pstmt) {
+        close(pstmt);
+        close(conn);
     }
 }

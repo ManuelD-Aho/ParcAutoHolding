@@ -1,5 +1,6 @@
 package main.java.com.miage.parcauto;
 
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -14,15 +15,14 @@ import javafx.stage.Stage;
 import javafx.util.StringConverter;
 
 import main.java.com.miage.parcauto.AppModels.Entretien;
-import main.java.com.miage.parcauto.AppModels.TypeEntretien;
 import main.java.com.miage.parcauto.AppModels.StatutOrdreTravail;
+import main.java.com.miage.parcauto.AppModels.TypeEntretien;
 import main.java.com.miage.parcauto.AppModels.Vehicule;
 import main.java.com.miage.parcauto.AppModels.RoleUtilisateur;
 import main.java.com.miage.parcauto.AppDataTransferObjects.EntretienDTO;
 import main.java.com.miage.parcauto.AppExceptions.*;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.net.URL;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,20 +52,21 @@ public class EntretienPanelController implements ViewController.InitializableSer
     @FXML private TableColumn<EntretienDTO, String> colMotifEntretienTable;
     @FXML private TableColumn<EntretienDTO, String> colTypeEntretienTable;
     @FXML private TableColumn<EntretienDTO, String> colStatutOTEntretienTable;
-    @FXML private TableColumn<EntretienDTO, BigDecimal> colCoutEntretienTable;
+    @FXML private TableColumn<EntretienDTO, java.math.BigDecimal> colCoutEntretienTable;
 
-    @FXML private Button boutonCreerEntretien;
+    @FXML private Button boutonAjouterEntretien;
     @FXML private Button boutonModifierEntretien;
-    @FXML private Button boutonSupprimerEntretien; // Moins courant, mais possible pour erreurs de saisie
+    @FXML private Button boutonSupprimerEntretien;
+    @FXML private Button boutonActualiserListeEntretiens;
     @FXML private Button boutonChangerStatutOT;
     @FXML private Button boutonDetailsEntretien;
-    @FXML private Button boutonActualiserListeEntretiens;
 
     @FXML private DatePicker datePickerFiltreDebutEntretien;
     @FXML private DatePicker datePickerFiltreFinEntretien;
     @FXML private ChoiceBox<TypeEntretien> choiceBoxFiltreTypeEntretien;
     @FXML private ChoiceBox<StatutOrdreTravail> choiceBoxFiltreStatutOT;
     @FXML private TextField champRechercheVehiculeEntretien;
+
 
     @Override
     public void injecterDependancesServices(BusinessLogicService bls, SecurityManager sm, ReportingEngine re, PersistenceService ps) {
@@ -85,7 +86,7 @@ public class EntretienPanelController implements ViewController.InitializableSer
         actionActualiserListeEntretiens();
 
         tableVueEntretiens.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
-            configurerEtatBoutonsContextuels(newSelection);
+            configurerEtatBoutonsContextuelsEntretiens(newSelection);
         });
     }
 
@@ -115,20 +116,26 @@ public class EntretienPanelController implements ViewController.InitializableSer
         datePickerFiltreFinEntretien.setConverter(ViewController.obtenirConvertisseurDateStandard());
 
         ObservableList<TypeEntretien> types = FXCollections.observableArrayList(TypeEntretien.values());
-        choiceBoxFiltreTypeEntretien.getItems().add(0, null); // Pour "Tous les types"
+        types.add(0, null);
         choiceBoxFiltreTypeEntretien.setItems(types);
         choiceBoxFiltreTypeEntretien.setConverter(new StringConverter<TypeEntretien>() {
             @Override public String toString(TypeEntretien type) { return type == null ? "Tous les types" : type.getDbValue(); }
-            @Override public TypeEntretien fromString(String string) { return "Tous les types".equals(string) ? null : TypeEntretien.fromDbValue(string); }
+            @Override public TypeEntretien fromString(String string) {
+                if ("Tous les types".equals(string) || string == null) return null;
+                return TypeEntretien.fromDbValue(string);
+            }
         });
         choiceBoxFiltreTypeEntretien.setValue(null);
 
         ObservableList<StatutOrdreTravail> statutsOT = FXCollections.observableArrayList(StatutOrdreTravail.values());
-        choiceBoxFiltreStatutOT.getItems().add(0, null); // Pour "Tous les statuts"
+        statutsOT.add(0, null);
         choiceBoxFiltreStatutOT.setItems(statutsOT);
         choiceBoxFiltreStatutOT.setConverter(new StringConverter<StatutOrdreTravail>() {
             @Override public String toString(StatutOrdreTravail statut) { return statut == null ? "Tous les statuts OT" : statut.getDbValue(); }
-            @Override public StatutOrdreTravail fromString(String string) { return "Tous les statuts OT".equals(string) ? null : StatutOrdreTravail.fromDbValue(string); }
+            @Override public StatutOrdreTravail fromString(String string) {
+                if ("Tous les statuts OT".equals(string) || string == null) return null;
+                return StatutOrdreTravail.fromDbValue(string);
+            }
         });
         choiceBoxFiltreStatutOT.setValue(null);
         CONTROLEUR_ENTRETIEN_LOGGER.fine("Options des filtres pour la liste des entretiens chargées.");
@@ -137,35 +144,24 @@ public class EntretienPanelController implements ViewController.InitializableSer
     private void configurerPermissionsActionsEntretiens() {
         RoleUtilisateur role = SessionManager.obtenirRoleUtilisateurActuel();
         if (role == null) {
-            Arrays.asList(boutonCreerEntretien, boutonModifierEntretien, boutonSupprimerEntretien, boutonChangerStatutOT, boutonDetailsEntretien)
+            Arrays.asList(boutonAjouterEntretien, boutonModifierEntretien, boutonSupprimerEntretien, boutonChangerStatutOT, boutonDetailsEntretien)
                     .stream().filter(Objects::nonNull).forEach(b -> b.setDisable(true));
             return;
         }
-        boolean peutGererEntretiens = gestionnaireSecurite.estAutorise(role, Permissions.ENTRETIEN_GERER_TOUS);
-        if (boutonCreerEntretien != null) boutonCreerEntretien.setDisable(!peutGererEntretiens && !gestionnaireSecurite.estAutorise(role, Permissions.ENTRETIEN_DECLARER_PANNE_CORRECTIF));
-        // Les autres boutons sont contextuels
+        boolean peutGerer = gestionnaireSecurite.estAutorise(role, Permissions.ENTRETIEN_GERER_TOUS);
+        if (boutonAjouterEntretien != null) boutonAjouterEntretien.setDisable(!peutGerer);
+        configurerEtatBoutonsContextuelsEntretiens(null);
     }
 
-    private void configurerEtatBoutonsContextuels(EntretienDTO entretienSelectionne) {
+    private void configurerEtatBoutonsContextuelsEntretiens(EntretienDTO entretienSelectionne) {
         boolean aucuneSelection = entretienSelectionne == null;
         RoleUtilisateur role = SessionManager.obtenirRoleUtilisateurActuel();
         boolean peutGerer = gestionnaireSecurite.estAutorise(role, Permissions.ENTRETIEN_GERER_TOUS);
 
-        if (boutonModifierEntretien != null) {
-            boolean peutModifier = !aucuneSelection && peutGerer && entretienSelectionne.getStatutOt() != StatutOrdreTravail.CLOTURE;
-            boutonModifierEntretien.setDisable(!peutModifier);
-        }
-        if (boutonSupprimerEntretien != null) {
-            boolean peutSupprimer = !aucuneSelection && peutGerer && entretienSelectionne.getStatutOt() == StatutOrdreTravail.OUVERT; // Supprimer que si Ouvert par ex.
-            boutonSupprimerEntretien.setDisable(!peutSupprimer);
-        }
-        if (boutonChangerStatutOT != null) {
-            boolean peutChangerStatut = !aucuneSelection && peutGerer && entretienSelectionne.getStatutOt() != StatutOrdreTravail.CLOTURE;
-            boutonChangerStatutOT.setDisable(!peutChangerStatut);
-        }
-        if (boutonDetailsEntretien != null) {
-            boutonDetailsEntretien.setDisable(aucuneSelection);
-        }
+        if (boutonModifierEntretien != null) boutonModifierEntretien.setDisable(aucuneSelection || !peutGerer);
+        if (boutonSupprimerEntretien != null) boutonSupprimerEntretien.setDisable(aucuneSelection || !peutGerer);
+        if (boutonChangerStatutOT != null) boutonChangerStatutOT.setDisable(aucuneSelection || !peutGerer);
+        if (boutonDetailsEntretien != null) boutonDetailsEntretien.setDisable(aucuneSelection);
     }
 
     @FXML
@@ -184,21 +180,20 @@ public class EntretienPanelController implements ViewController.InitializableSer
             List<Entretien> entretiensModel = serviceLogiqueMetier.rechercherEntretiensFiltres(
                     dateTimeDebutFiltre, dateTimeFinFiltre, typeFiltre, statutOTFiltre, rechercheVehicule
             );
-
             List<EntretienDTO> entretiensDto = DataMapper.convertirVersListeDeEntretienDTO(entretiensModel, servicePersistance);
             tableVueEntretiens.setItems(FXCollections.observableArrayList(entretiensDto));
             tableVueEntretiens.refresh();
-            configurerEtatBoutonsContextuels(null);
-            CONTROLEUR_ENTRETIEN_LOGGER.info(entretiensDto.size() + " entretiens chargés et affichés après actualisation/filtrage.");
+            configurerEtatBoutonsContextuelsEntretiens(null);
+            CONTROLEUR_ENTRETIEN_LOGGER.info(entretiensDto.size() + " entretiens chargés et affichés.");
         } catch (Exception e) {
-            CONTROLEUR_ENTRETIEN_LOGGER.log(Level.SEVERE, "Erreur majeure lors de l'actualisation ou du filtrage des données des entretiens.", e);
-            afficherNotificationAlerteInterface("Erreur de Données Entretiens", "Impossible de charger ou filtrer la liste des entretiens : " + e.getMessage(), Alert.AlertType.ERROR);
+            CONTROLEUR_ENTRETIEN_LOGGER.log(Level.SEVERE, "Erreur lors de l'actualisation des entretiens.", e);
+            afficherNotificationAlerteInterface("Erreur de Données", "Impossible de charger la liste des entretiens : " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
     @FXML
-    private void actionOuvrirFormulaireCreationEntretien() {
-        CONTROLEUR_ENTRETIEN_LOGGER.fine("Action utilisateur : ouvrir formulaire de création d'entretien.");
+    private void actionOuvrirFormulaireAjoutEntretien() {
+        CONTROLEUR_ENTRETIEN_LOGGER.fine("Action utilisateur : ouvrir formulaire d'ajout d'entretien.");
         ouvrirDialogueFormulaireEntretien(null);
     }
 
@@ -206,11 +201,7 @@ public class EntretienPanelController implements ViewController.InitializableSer
     private void actionOuvrirFormulaireModificationEntretien() {
         EntretienDTO entretienSelectionneDto = tableVueEntretiens.getSelectionModel().getSelectedItem();
         if (entretienSelectionneDto == null) {
-            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un entretien pour le modifier.", Alert.AlertType.INFORMATION);
-            return;
-        }
-        if (entretienSelectionneDto.getStatutOt() == StatutOrdreTravail.CLOTURE) {
-            afficherNotificationAlerteInterface("Action Impossible", "Un entretien clôturé ne peut pas être modifié.", Alert.AlertType.WARNING);
+            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un entretien à modifier.", Alert.AlertType.INFORMATION);
             return;
         }
         CONTROLEUR_ENTRETIEN_LOGGER.fine("Action utilisateur : ouvrir formulaire de modification pour entretien ID: " + entretienSelectionneDto.getIdEntretien());
@@ -225,7 +216,7 @@ public class EntretienPanelController implements ViewController.InitializableSer
 
     private void ouvrirDialogueFormulaireEntretien(Entretien entretienAEditer) {
         try {
-            String titreDialogue = (entretienAEditer == null) ? "Enregistrer un Nouvel Entretien/Maintenance" : "Modifier l'Entretien ID: " + entretienAEditer.getIdEntretien();
+            String titreDialogue = (entretienAEditer == null) ? "Planifier un Nouvel Entretien" : "Modifier l'Entretien ID: " + entretienAEditer.getIdEntretien();
             String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireEntretienView.fxml";
             URL urlFxml = getClass().getResource(cheminFxmlFormulaire);
             if (urlFxml == null) throw new IOException("Fichier FXML du formulaire entretien introuvable: " + cheminFxmlFormulaire);
@@ -249,11 +240,11 @@ public class EntretienPanelController implements ViewController.InitializableSer
 
             stageDialogue.showAndWait();
             actionActualiserListeEntretiens();
-            CONTROLEUR_ENTRETIEN_LOGGER.info("Dialogue du formulaire entretien fermé. Table des entretiens rafraîchie si nécessaire.");
+            CONTROLEUR_ENTRETIEN_LOGGER.info("Dialogue du formulaire entretien fermé.");
 
         } catch (IOException e) {
-            CONTROLEUR_ENTRETIEN_LOGGER.log(Level.SEVERE, "Erreur critique lors de l'ouverture ou de la gestion du formulaire entretien.", e);
-            afficherNotificationAlerteInterface("Erreur d'Interface Majeure", "Impossible d'ouvrir le formulaire de gestion des entretiens : " + e.getMessage(), Alert.AlertType.ERROR);
+            CONTROLEUR_ENTRETIEN_LOGGER.log(Level.SEVERE, "Erreur critique lors de l'ouverture du formulaire entretien.", e);
+            afficherNotificationAlerteInterface("Erreur d'Interface Majeure", "Impossible d'ouvrir le formulaire : " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
@@ -264,19 +255,14 @@ public class EntretienPanelController implements ViewController.InitializableSer
             afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un entretien à supprimer.", Alert.AlertType.INFORMATION);
             return;
         }
-        if (entretienSelectionne.getStatutOt() != StatutOrdreTravail.OUVERT) {
-            afficherNotificationAlerteInterface("Action Impossible", "Seuls les entretiens avec le statut 'Ouvert' peuvent être supprimés.", Alert.AlertType.WARNING);
-            return;
-        }
-
         Optional<ButtonType> reponse = afficherDialogueConfirmationInterface("Confirmation de Suppression",
-                "Êtes-vous sûr de vouloir supprimer l'entrée d'entretien ID " + entretienSelectionne.getIdEntretien() + " ?");
-        if (reponse.isPresent() && reponse.get() == ButtonType.OK) {
+                "Êtes-vous sûr de vouloir supprimer l'entretien ID " + entretienSelectionne.getIdEntretien() + " pour le véhicule " + entretienSelectionne.getImmatriculationVehicule() + "?", ButtonType.YES, ButtonType.NO);
+        if (reponse.isPresent() && reponse.get() == ButtonType.YES) {
             try {
                 serviceLogiqueMetier.supprimerEntretien(entretienSelectionne.getIdEntretien());
                 actionActualiserListeEntretiens();
                 afficherNotificationAlerteInterface("Suppression Réussie", "L'entretien a été supprimé.", Alert.AlertType.INFORMATION);
-            } catch (ErreurLogiqueMetier e) {
+            } catch (ErreurLogiqueMetier | ErreurBaseDeDonnees e) {
                 afficherNotificationAlerteInterface("Échec de Suppression", e.getMessage(), Alert.AlertType.ERROR);
             }
         }
@@ -285,48 +271,26 @@ public class EntretienPanelController implements ViewController.InitializableSer
     @FXML
     private void actionOuvrirDialogueChangerStatutOT() {
         EntretienDTO entretienSelectionne = tableVueEntretiens.getSelectionModel().getSelectedItem();
-        if (entretienSelectionne == null || entretienSelectionne.getStatutOt() == StatutOrdreTravail.CLOTURE) {
-            afficherNotificationAlerteInterface("Action Impossible", "Veuillez sélectionner un entretien non clôturé pour changer son statut d'OT.", Alert.AlertType.WARNING);
+        if (entretienSelectionne == null) {
+            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un entretien pour changer le statut de l'OT.", Alert.AlertType.INFORMATION);
             return;
         }
 
-        Dialog<StatutOrdreTravail> dialogue = new Dialog<>();
+        ChoiceDialog<StatutOrdreTravail> dialogue = new ChoiceDialog<>(entretienSelectionne.getStatutOt(), StatutOrdreTravail.values());
         dialogue.setTitle("Changer Statut Ordre de Travail");
         dialogue.setHeaderText("Modifier le statut de l'OT pour l'entretien ID: " + entretienSelectionne.getIdEntretien());
+        dialogue.setContentText("Choisissez le nouveau statut:");
         Stage stageProprietaire = MainApp.getPrimaryStage();
         if (stageProprietaire != null) dialogue.initOwner(stageProprietaire);
-
-        ChoiceBox<StatutOrdreTravail> choixNouveauStatutOT = new ChoiceBox<>();
-        // Exclure le statut actuel et les statuts illogiques (on ne revient pas de Cloturé à Ouvert par ex)
-        List<StatutOrdreTravail> statutsPossibles = Arrays.stream(StatutOrdreTravail.values())
-                .filter(s -> s != entretienSelectionne.getStatutOt())
-                .collect(Collectors.toList());
-        if (entretienSelectionne.getStatutOt() == StatutOrdreTravail.OUVERT) {
-            statutsPossibles.remove(StatutOrdreTravail.CLOTURE); // On passe par EnCours d'abord
-        } else if (entretienSelectionne.getStatutOt() == StatutOrdreTravail.EN_COURS) {
-            // Peut aller à Cloturé ou (moins probable) revenir à Ouvert si erreur.
-        }
-
-
-        choixNouveauStatutOT.setItems(FXCollections.observableArrayList(statutsPossibles));
-        choixNouveauStatutOT.setConverter(new StringConverter<StatutOrdreTravail>() {
-            @Override public String toString(StatutOrdreTravail statut) { return statut == null ? "" : statut.getDbValue(); }
-            @Override public StatutOrdreTravail fromString(String string) { return StatutOrdreTravail.fromDbValue(string); }
-        });
-        dialogue.getDialogPane().setContent(choixNouveauStatutOT);
-        ButtonType boutonConfirmerChangement = ButtonType.OK;
-        dialogue.getDialogPane().getButtonTypes().addAll(boutonConfirmerChangement, ButtonType.CANCEL);
-
-        dialogue.setResultConverter(typeBouton -> (typeBouton == boutonConfirmerChangement && choixNouveauStatutOT.getValue() != null) ? choixNouveauStatutOT.getValue() : null);
 
         Optional<StatutOrdreTravail> resultat = dialogue.showAndWait();
         resultat.ifPresent(nouveauStatut -> {
             try {
-                serviceLogiqueMetier.changerStatutOrdreTravailEntretien(entretienSelectionne.getIdEntretien(), nouveauStatut);
+                serviceLogiqueMetier.changerStatutOrdreTravail(entretienSelectionne.getIdEntretien(), nouveauStatut);
                 actionActualiserListeEntretiens();
-                afficherNotificationAlerteInterface("Statut Mis à Jour", "Le statut de l'ordre de travail a été changé.", Alert.AlertType.INFORMATION);
-            } catch (ErreurLogiqueMetier e) {
-                afficherNotificationAlerteInterface("Échec Mise à Jour Statut", e.getMessage(), Alert.AlertType.ERROR);
+                afficherNotificationAlerteInterface("Statut Modifié", "Le statut de l'OT a été mis à jour.", Alert.AlertType.INFORMATION);
+            } catch (ErreurLogiqueMetier | ErreurBaseDeDonnees e) {
+                afficherNotificationAlerteInterface("Échec Modification Statut", e.getMessage(), Alert.AlertType.ERROR);
             }
         });
     }
@@ -335,7 +299,7 @@ public class EntretienPanelController implements ViewController.InitializableSer
     private void actionAfficherDetailsEntretien() {
         EntretienDTO entretienSelectionne = tableVueEntretiens.getSelectionModel().getSelectedItem();
         if (entretienSelectionne == null) {
-            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un entretien pour en voir les détails.", Alert.AlertType.INFORMATION);
+            afficherNotificationAlerteInterface("Sélection Requise", "Veuillez sélectionner un entretien pour voir les détails.", Alert.AlertType.INFORMATION);
             return;
         }
         Entretien entretienComplet = servicePersistance.trouverEntretienParId(entretienSelectionne.getIdEntretien());
@@ -343,22 +307,23 @@ public class EntretienPanelController implements ViewController.InitializableSer
             afficherNotificationAlerteInterface("Donnée Introuvable", "Impossible de récupérer les détails complets de l'entretien.", Alert.AlertType.WARNING);
             return;
         }
-        Vehicule vehiculeConcerne = servicePersistance.trouverVehiculeParId(entretienComplet.getIdVehicule());
+        Vehicule vehiculeAssocie = servicePersistance.trouverVehiculeParId(entretienComplet.getIdVehicule());
 
         StringBuilder details = new StringBuilder();
         details.append("ID Entretien: ").append(entretienComplet.getIdEntretien()).append("\n");
-        details.append("Véhicule: ").append(entretienSelectionne.getImmatriculationVehicule()).append(" (").append(entretienSelectionne.getMarqueModeleVehicule()).append(")\n");
-        details.append("Date d'Entrée: ").append(entretienComplet.getDateEntreeEntr() != null ? entretienComplet.getDateEntreeEntr().format(ViewController.FORMATTEUR_DATETIME_STANDARD_VUE) : "N/A").append("\n");
-        details.append("Date de Sortie: ").append(entretienComplet.getDateSortieEntr() != null ? entretienComplet.getDateSortieEntr().format(ViewController.FORMATTEUR_DATETIME_STANDARD_VUE) : "N/A").append("\n");
+        details.append("Véhicule: ").append(vehiculeAssocie != null ? vehiculeAssocie.getImmatriculation() + " (" + vehiculeAssocie.getMarque() + " " + vehiculeAssocie.getModele() + ")" : "N/A").append("\n");
+        details.append("Date Entrée: ").append(entretienComplet.getDateEntreeEntr() != null ? entretienComplet.getDateEntreeEntr().format(ViewController.FORMATTEUR_DATETIME_STANDARD_VUE) : "N/A").append("\n");
+        details.append("Date Sortie: ").append(entretienComplet.getDateSortieEntr() != null ? entretienComplet.getDateSortieEntr().format(ViewController.FORMATTEUR_DATETIME_STANDARD_VUE) : "N/A").append("\n");
         details.append("Motif: ").append(entretienComplet.getMotifEntr()).append("\n");
-        details.append("Type: ").append(entretienComplet.getType().getDbValue()).append("\n");
-        details.append("Statut OT: ").append(entretienComplet.getStatutOt().getDbValue()).append("\n");
-        details.append("Lieu: ").append(entretienComplet.getLieuEntr() != null ? entretienComplet.getLieuEntr() : "Non spécifié").append("\n");
+        details.append("Type: ").append(entretienComplet.getType() != null ? entretienComplet.getType().getDbValue() : "N/A").append("\n");
+        details.append("Statut OT: ").append(entretienComplet.getStatutOt() != null ? entretienComplet.getStatutOt().getDbValue() : "N/A").append("\n");
         details.append("Coût: ").append(entretienComplet.getCoutEntr() != null ? entretienComplet.getCoutEntr() : "N/A").append(" EUR\n");
-        details.append("Observation: ").append(entretienComplet.getObservation() != null ? entretienComplet.getObservation() : "Aucune").append("\n");
+        details.append("Lieu: ").append(entretienComplet.getLieuEntr() != null ? entretienComplet.getLieuEntr() : "Non spécifié").append("\n");
+        details.append("Observations: ").append(entretienComplet.getObservation() != null ? entretienComplet.getObservation() : "Aucune").append("\n");
 
-        afficherNotificationAlerteInterface("Détails de l'Entretien ID: " + entretienComplet.getIdEntretien(), details.toString(), Alert.AlertType.INFORMATION);
+        afficherNotificationAlerteInterface("Détails de l'Entretien", details.toString(), Alert.AlertType.INFORMATION);
     }
+
 
     private void afficherNotificationAlerteInterface(String titre, String message, Alert.AlertType typeAlerte) {
         Alert alerte = new Alert(typeAlerte);
@@ -372,11 +337,14 @@ public class EntretienPanelController implements ViewController.InitializableSer
         alerte.showAndWait();
     }
 
-    private Optional<ButtonType> afficherDialogueConfirmationInterface(String titre, String message) {
+    private Optional<ButtonType> afficherDialogueConfirmationInterface(String titre, String message, ButtonType... buttonTypes) {
         Alert dialogue = new Alert(Alert.AlertType.CONFIRMATION);
         dialogue.setTitle(titre);
         dialogue.setHeaderText(null);
         dialogue.setContentText(message);
+        if (buttonTypes != null && buttonTypes.length > 0) {
+            dialogue.getButtonTypes().setAll(buttonTypes);
+        }
         Stage stagePrincipal = MainApp.getPrimaryStage();
         if (stagePrincipal != null && stagePrincipal.getScene() != null && stagePrincipal.isShowing()) {
             dialogue.initOwner(stagePrincipal);

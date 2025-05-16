@@ -1,0 +1,32 @@
+[2025-05-16 10:22:33.326] [INFOS  ] [main.java.com.miage.parcauto] Système de journalisation initialisé. Logs vers: logs\ParcAutoApplication_2025-05-16_10-22-33.log
+[2025-05-16 10:22:33.333] [INFOS  ] [main.java.com.miage.parcauto] Méthode main. Lancement application JavaFX.
+[2025-05-16 10:22:33.358] [INFOS  ] [main.java.com.miage.parcauto] Démarrage de l'application ParcAuto MIAGE Holding.
+[2025-05-16 10:22:33.361] [INFOS  ] [main.java.com.miage.parcauto] Initialisation de l'infrastructure applicative.
+[2025-05-16 10:22:33.362] [PRÉCIS ] [main.java.com.miage.parcauto] Validation de la connexion à la base de données.
+[2025-05-16 10:22:33.386] [INFOS  ] [dbUtil] Fichier de configuration de la base de données 'db.properties' chargé avec succès depuis le package.
+[2025-05-16 10:22:33.394] [INFOS  ] [dbUtil] Driver JDBC chargé : com.mysql.cj.jdbc.Driver
+[2025-05-16 10:22:33.623] [PRÉCIS ] [dbUtil] Connexion à la base de données établie.
+[2025-05-16 10:22:33.623] [INFOS  ] [main.java.com.miage.parcauto] Connectivité à la base de données validée.
+[2025-05-16 10:22:33.659] [PRÉCIS ] [main.java.com.miage.parcauto] PersistenceService instancié.
+[2025-05-16 10:22:33.660] [PRÉCIS ] [main.java.com.miage.parcauto] SecurityManager instancié.
+[2025-05-16 10:22:33.660] [PRÉCIS ] [main.java.com.miage.parcauto] BusinessLogicService instancié.
+[2025-05-16 10:22:33.663] [INFOS  ] [ReportingEngine] Dossier des rapports créé : C:\THEBLACK\ParcAutoHolding\rapports_generes
+[2025-05-16 10:22:33.663] [PRÉCIS ] [main.java.com.miage.parcauto] ReportingEngine instancié.
+[2025-05-16 10:22:33.663] [INFOS  ] [main.java.com.miage.parcauto] Tous les services principaux initialisés.
+[2025-05-16 10:22:33.663] [INFOS  ] [main.java.com.miage.parcauto] Chargement de LoginView.fxml.
+[2025-05-16 10:22:33.663] [GRAVE  ] [main.java.com.miage.parcauto] Ressource FXML introuvable : /main/java/com/miage/parcauto/fxml/LoginView.fxml
+[2025-05-16 10:22:33.665] [GRAVE  ] [main.java.com.miage.parcauto] Erreur fatale lors du démarrage: Ressource FXML introuvable : /main/java/com/miage/parcauto/fxml/LoginView.fxml
+java.io.IOException: Ressource FXML introuvable : /main/java/com/miage/parcauto/fxml/LoginView.fxml
+	at main.java.com.miage.parcauto.MainApp.preparerChargeurFXML(MainApp.java:171)
+	at main.java.com.miage.parcauto.MainApp.chargerInterfaceConnexion(MainApp.java:179)
+	at main.java.com.miage.parcauto.MainApp.start(MainApp.java:122)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.LauncherImpl.lambda$launchApplication1$9(LauncherImpl.java:839)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runAndWait$12(PlatformImpl.java:483)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runLater$10(PlatformImpl.java:456)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:400)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runLater$11(PlatformImpl.java:455)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.InvokeLaterDispatcher$Future.run(InvokeLaterDispatcher.java:95)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.win.WinApplication._runLoop(Native Method)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.win.WinApplication.lambda$runLoop$3(WinApplication.java:185)
+	at java.base/java.lang.Thread.run(Thread.java:1570)
+

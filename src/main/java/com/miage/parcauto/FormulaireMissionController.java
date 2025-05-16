@@ -29,30 +29,28 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class FormulaireMissionController implements ViewController.InitializableServices {
-    private static final Logger FORM_MISSION_LOGGER = Logger.getLogger(FormulaireMissionController.class.getName());
 
+    private static final Logger CONTROLEUR_FORM_MISSION_LOGGER = Logger.getLogger(FormulaireMissionController.class.getName());
     private BusinessLogicService serviceLogiqueMetier;
     private SecurityManager gestionnaireSecurite;
     private ReportingEngine moteurRapports;
     private PersistenceService servicePersistance;
 
-    private Mission missionEnCoursEdition;
-    private boolean modeCreation;
+    @FXML private TextField champLibelleMissionForm;
+    @FXML private ChoiceBox<Vehicule> choiceBoxVehiculeMissionForm;
+    @FXML private TextField champSiteMissionForm;
+    @FXML private DatePicker datePickerDebutMissionForm;
+    @FXML private TextField champHeureDebutMissionForm; // Format HH:MM
+    @FXML private DatePicker datePickerFinMissionForm;
+    @FXML private TextField champHeureFinMissionForm;   // Format HH:MM
+    @FXML private TextField champKmPrevuMissionForm;
+    @FXML private TextArea textAreaCircuitMissionForm;
+    @FXML private TextArea textAreaObservationMissionForm;
+    @FXML private Button boutonEnregistrerMissionForm;
+    @FXML private Button boutonAnnulerMissionForm;
+    @FXML private Label labelTitreFormulaireMission;
 
-    @FXML private TextField champLibelleMission;
-    @FXML private ChoiceBox<Vehicule> choiceBoxVehiculeMission;
-    @FXML private TextField champSiteMission;
-    @FXML private DatePicker datePickerDebutMission;
-    @FXML private TextField champHeureDebutMission; // Format HH:mm
-    @FXML private DatePicker datePickerFinMissionPrevue; // Optionnel, ou calculé
-    @FXML private TextField champHeureFinMissionPrevue; // Optionnel
-    @FXML private TextField champKmPrevuMission;
-    @FXML private TextArea textAreaCircuitMission;
-    @FXML private TextArea textAreaObservationMission;
-
-    @FXML private Button boutonSauvegarderMission;
-    @FXML private Button boutonAnnulerFormulaireMission;
-    @FXML private Label etiquetteTitreFormulaireMission;
+    private Mission missionExistantePourModification;
 
     @Override
     public void injecterDependancesServices(BusinessLogicService bls, SecurityManager sm, ReportingEngine re, PersistenceService ps) {
@@ -60,228 +58,170 @@ public class FormulaireMissionController implements ViewController.Initializable
         this.gestionnaireSecurite = Objects.requireNonNull(sm);
         this.moteurRapports = Objects.requireNonNull(re);
         this.servicePersistance = Objects.requireNonNull(ps);
-        FORM_MISSION_LOGGER.fine("Dépendances services injectées dans FormulaireMissionController.");
+        CONTROLEUR_FORM_MISSION_LOGGER.fine("Dépendances services injectées.");
     }
 
     @Override
-    public void initialiserDonneesVue() {
-        FORM_MISSION_LOGGER.info("Initialisation des données pour le formulaire de mission.");
-        chargerOptionsChoiceBoxVehicules();
-        configurerConvertisseursDateHeure();
+    public void initialiserDonneesVue() { /* Non utilisé ici, voir preparerFormulairePourEdition */ }
 
-        if (modeCreation) {
-            etiquetteTitreFormulaireMission.setText("Planification d'une Nouvelle Mission");
-            this.missionEnCoursEdition = new Mission();
-            datePickerDebutMission.setValue(LocalDate.now()); // Pré-remplir date début
-            champHeureDebutMission.setText(LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
-        } else if (this.missionEnCoursEdition != null) {
-            etiquetteTitreFormulaireMission.setText("Modification de la Mission : " + missionEnCoursEdition.getLibMission());
-            preRemplirChampsFormulaireMission();
-        } else {
-            FORM_MISSION_LOGGER.severe("Formulaire mission ouvert en mode édition sans mission fournie.");
-            afficherNotificationAlerteFormulaire("Erreur Critique de Données", "Aucune mission n'a été spécifiée pour la modification.", Alert.AlertType.ERROR);
-            actionAnnulerFormulaire();
+    public void preparerFormulairePourEdition(Mission mission) {
+        this.missionExistantePourModification = mission;
+        chargerVehiculesDisponiblesPourFormulaire();
+
+        if (mission == null) { // Mode création
+            labelTitreFormulaireMission.setText("Planifier une Nouvelle Mission");
+            champLibelleMissionForm.clear();
+            choiceBoxVehiculeMissionForm.getSelectionModel().clearSelection();
+            champSiteMissionForm.clear();
+            datePickerDebutMissionForm.setValue(LocalDate.now());
+            champHeureDebutMissionForm.setText(LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+            datePickerFinMissionForm.setValue(null);
+            champHeureFinMissionForm.clear();
+            champKmPrevuMissionForm.clear();
+            textAreaCircuitMissionForm.clear();
+            textAreaObservationMissionForm.clear();
+        } else { // Mode modification
+            labelTitreFormulaireMission.setText("Modifier la Mission : " + mission.getLibMission());
+            champLibelleMissionForm.setText(mission.getLibMission());
+            Vehicule vAssigne = servicePersistance.trouverVehiculeParId(mission.getIdVehicule());
+            if (vAssigne != null) { // Ajouter le véhicule assigné à la liste s'il n'est pas "Disponible"
+                if (!choiceBoxVehiculeMissionForm.getItems().contains(vAssigne)) {
+                    choiceBoxVehiculeMissionForm.getItems().add(vAssigne);
+                }
+                choiceBoxVehiculeMissionForm.setValue(vAssigne);
+            }
+            champSiteMissionForm.setText(mission.getSite());
+            if (mission.getDateDebutMission() != null) {
+                datePickerDebutMissionForm.setValue(mission.getDateDebutMission().toLocalDate());
+                champHeureDebutMissionForm.setText(mission.getDateDebutMission().toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+            }
+            if (mission.getDateFinMission() != null) {
+                datePickerFinMissionForm.setValue(mission.getDateFinMission().toLocalDate());
+                champHeureFinMissionForm.setText(mission.getDateFinMission().toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
+            }
+            champKmPrevuMissionForm.setText(mission.getKmPrevu() != null ? String.valueOf(mission.getKmPrevu()) : "");
+            textAreaCircuitMissionForm.setText(mission.getCircuitMission());
+            textAreaObservationMissionForm.setText(mission.getObservationMission());
         }
     }
 
-    public void preparerFormulairePourEdition(Mission mission) {
-        this.missionEnCoursEdition = mission;
-        this.modeCreation = (mission == null);
-    }
-
-    private void chargerOptionsChoiceBoxVehicules() {
+    private void chargerVehiculesDisponiblesPourFormulaire() {
         try {
-            // Charger uniquement les véhicules disponibles
             EtatVoiture etatDisponible = servicePersistance.trouverEtatVoitureParLibelle("Disponible");
             List<Vehicule> vehiculesDisponibles;
             if (etatDisponible != null) {
                 vehiculesDisponibles = servicePersistance.trouverVehiculesParEtat(etatDisponible.getIdEtatVoiture());
             } else {
-                FORM_MISSION_LOGGER.warning("L'état 'Disponible' n'a pas été trouvé. Tous les véhicules sont listés pour la mission.");
-                vehiculesDisponibles = servicePersistance.trouverTousLesVehicules(); // Fallback, moins idéal
+                CONTROLEUR_FORM_MISSION_LOGGER.warning("L'état 'Disponible' non trouvé, chargement de tous les véhicules.");
+                vehiculesDisponibles = servicePersistance.trouverTousLesVehicules(); // Fallback
             }
 
-            // Si en mode édition et que le véhicule de la mission n'est plus "Disponible", l'ajouter quand même à la liste pour qu'il soit sélectionné
-            if (!modeCreation && missionEnCoursEdition != null) {
-                Vehicule vehiculeMissionActuelle = servicePersistance.trouverVehiculeParId(missionEnCoursEdition.getIdVehicule());
-                if (vehiculeMissionActuelle != null && !vehiculesDisponibles.contains(vehiculeMissionActuelle)) {
-                    // Vérifier si l'état actuel du véhicule de la mission est celui de la mission.
-                    // Si la mission est "Planifiée", le véhicule devrait être "Disponible" ou celui assigné.
-                    // Si la mission est déjà "En cours" (ne devrait pas arriver ici car on modifie que les planifiées),
-                    // le véhicule serait "En mission".
-                    boolean estPresent = vehiculesDisponibles.stream().anyMatch(v -> v.getIdVehicule() == vehiculeMissionActuelle.getIdVehicule());
-                    if (!estPresent) {
-                        vehiculesDisponibles.add(0, vehiculeMissionActuelle); // L'ajouter en tête
-                    }
-                }
-            }
-
-
-            choiceBoxVehiculeMission.setItems(FXCollections.observableArrayList(vehiculesDisponibles));
-            choiceBoxVehiculeMission.setConverter(new StringConverter<Vehicule>() {
-                @Override public String toString(Vehicule vehicule) {
-                    return vehicule == null ? "" : vehicule.getImmatriculation() + " (" + vehicule.getMarque() + " " + vehicule.getModele() + ")";
-                }
-                @Override public Vehicule fromString(String string) { return null; } // Non nécessaire pour la sélection
+            choiceBoxVehiculeMissionForm.setItems(FXCollections.observableArrayList(vehiculesDisponibles));
+            choiceBoxVehiculeMissionForm.setConverter(new StringConverter<Vehicule>() {
+                @Override public String toString(Vehicule v) { return v == null ? "Sélectionner..." : v.getMarque() + " " + v.getModele() + " (" + v.getImmatriculation() + ")"; }
+                @Override public Vehicule fromString(String string) { return null; }
             });
         } catch (Exception e) {
-            FORM_MISSION_LOGGER.log(Level.SEVERE, "Erreur lors du chargement de la liste des véhicules disponibles.", e);
-            afficherNotificationAlerteFormulaire("Erreur de Chargement", "Impossible de charger la liste des véhicules : " + e.getMessage(), Alert.AlertType.ERROR);
+            CONTROLEUR_FORM_MISSION_LOGGER.log(Level.SEVERE, "Impossible de charger les véhicules pour le formulaire de mission.", e);
+            afficherNotificationAlerteInterface("Erreur Données Véhicules", "Liste des véhicules indisponible: " + e.getMessage(), Alert.AlertType.ERROR);
         }
-        FORM_MISSION_LOGGER.fine("Liste des véhicules disponibles chargée pour la sélection.");
-    }
-
-    private void configurerConvertisseursDateHeure() {
-        datePickerDebutMission.setConverter(ViewController.obtenirConvertisseurDateStandard());
-        datePickerFinMissionPrevue.setConverter(ViewController.obtenirConvertisseurDateStandard());
-        // Ajouter des validateurs ou des formateurs pour les champs d'heure si nécessaire
-        FORM_MISSION_LOGGER.fine("Convertisseurs de date pour les DatePicker du formulaire mission configurés.");
-    }
-
-    private void preRemplirChampsFormulaireMission() {
-        if (missionEnCoursEdition == null) return;
-
-        champLibelleMission.setText(missionEnCoursEdition.getLibMission());
-        Vehicule vehiculeAssigne = servicePersistance.trouverVehiculeParId(missionEnCoursEdition.getIdVehicule());
-        if (vehiculeAssigne != null) choiceBoxVehiculeMission.setValue(vehiculeAssigne);
-
-        champSiteMission.setText(missionEnCoursEdition.getSite());
-        if (missionEnCoursEdition.getDateDebutMission() != null) {
-            datePickerDebutMission.setValue(missionEnCoursEdition.getDateDebutMission().toLocalDate());
-            champHeureDebutMission.setText(missionEnCoursEdition.getDateDebutMission().toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
-        }
-        if (missionEnCoursEdition.getDateFinMission() != null) { // Date de fin prévue
-            datePickerFinMissionPrevue.setValue(missionEnCoursEdition.getDateFinMission().toLocalDate());
-            champHeureFinMissionPrevue.setText(missionEnCoursEdition.getDateFinMission().toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")));
-        }
-        champKmPrevuMission.setText(missionEnCoursEdition.getKmPrevu() != null ? String.valueOf(missionEnCoursEdition.getKmPrevu()) : "");
-        textAreaCircuitMission.setText(missionEnCoursEdition.getCircuitMission());
-        textAreaObservationMission.setText(missionEnCoursEdition.getObservationMission());
-
-        FORM_MISSION_LOGGER.info("Champs du formulaire pré-remplis avec les données de la mission ID: " + missionEnCoursEdition.getIdMission());
     }
 
     @FXML
-    private void actionSauvegarderMission() {
-        FORM_MISSION_LOGGER.fine("Tentative de sauvegarde de la mission.");
-        if (!validerSaisiesFormulaireMission()) {
-            FORM_MISSION_LOGGER.warning("Validation des saisies du formulaire mission échouée.");
+    private void actionEnregistrerMission() {
+        String libelle = champLibelleMissionForm.getText();
+        Vehicule vehiculeSelectionne = choiceBoxVehiculeMissionForm.getValue();
+        String site = champSiteMissionForm.getText();
+        LocalDate dateDebut = datePickerDebutMissionForm.getValue();
+        String heureDebutStr = champHeureDebutMissionForm.getText();
+        LocalDate dateFin = datePickerFinMissionForm.getValue();
+        String heureFinStr = champHeureFinMissionForm.getText();
+        String kmPrevuStr = champKmPrevuMissionForm.getText();
+        String circuit = textAreaCircuitMissionForm.getText();
+        String observation = textAreaObservationMissionForm.getText();
+
+        if (libelle.trim().isEmpty() || vehiculeSelectionne == null || dateDebut == null || heureDebutStr.trim().isEmpty()) {
+            afficherNotificationAlerteInterface("Champs Obligatoires", "Libellé, véhicule, date et heure de début sont requis.", Alert.AlertType.WARNING);
+            return;
+        }
+
+        LocalDateTime dateTimeDebut;
+        LocalDateTime dateTimeFin = null;
+        Integer kmPrevu = null;
+
+        try {
+            LocalTime heureDebut = LocalTime.parse(heureDebutStr, java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            dateTimeDebut = LocalDateTime.of(dateDebut, heureDebut);
+
+            if (dateFin != null && !heureFinStr.trim().isEmpty()) {
+                LocalTime heureFin = LocalTime.parse(heureFinStr, java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+                dateTimeFin = LocalDateTime.of(dateFin, heureFin);
+            } else if (dateFin != null) { // Si date mais pas heure, prendre fin de journée
+                dateTimeFin = LocalDateTime.of(dateFin, LocalTime.MAX);
+            }
+
+
+            if (kmPrevuStr != null && !kmPrevuStr.trim().isEmpty()) {
+                kmPrevu = Integer.parseInt(kmPrevuStr);
+            }
+        } catch (java.time.format.DateTimeParseException e) {
+            afficherNotificationAlerteInterface("Format Heure Invalide", "Veuillez entrer les heures au format HH:MM (ex: 09:30).", Alert.AlertType.ERROR);
+            return;
+        } catch (NumberFormatException e) {
+            afficherNotificationAlerteInterface("Format Nombre Invalide", "Le kilométrage prévu doit être un nombre entier.", Alert.AlertType.ERROR);
             return;
         }
 
         try {
-            missionEnCoursEdition.setLibMission(champLibelleMission.getText().trim());
-            if (choiceBoxVehiculeMission.getValue() == null) {
-                throw new ErreurValidation("Un véhicule doit être sélectionné pour la mission.");
+            if (missionExistantePourModification == null) { // Création
+                Mission nouvelleMission = new Mission();
+                nouvelleMission.setLibMission(libelle);
+                nouvelleMission.setIdVehicule(vehiculeSelectionne.getIdVehicule());
+                nouvelleMission.setSite(site);
+                nouvelleMission.setDateDebutMission(dateTimeDebut);
+                nouvelleMission.setDateFinMission(dateTimeFin);
+                nouvelleMission.setKmPrevu(kmPrevu);
+                nouvelleMission.setCircuitMission(circuit);
+                nouvelleMission.setObservationMission(observation);
+                serviceLogiqueMetier.planifierNouvelleMission(nouvelleMission);
+                afficherNotificationAlerteInterface("Mission Planifiée", "La nouvelle mission a été enregistrée avec succès.", Alert.AlertType.INFORMATION);
+            } else { // Modification
+                missionExistantePourModification.setLibMission(libelle);
+                missionExistantePourModification.setIdVehicule(vehiculeSelectionne.getIdVehicule());
+                missionExistantePourModification.setSite(site);
+                missionExistantePourModification.setDateDebutMission(dateTimeDebut);
+                missionExistantePourModification.setDateFinMission(dateTimeFin);
+                missionExistantePourModification.setKmPrevu(kmPrevu);
+                missionExistantePourModification.setCircuitMission(circuit);
+                missionExistantePourModification.setObservationMission(observation);
+                // Le statut est géré par BusinessLogicService pour la modification
+                serviceLogiqueMetier.modifierMission(missionExistantePourModification);
+                afficherNotificationAlerteInterface("Mission Modifiée", "Les informations de la mission ont été mises à jour.", Alert.AlertType.INFORMATION);
             }
-            missionEnCoursEdition.setIdVehicule(choiceBoxVehiculeMission.getValue().getIdVehicule());
-            missionEnCoursEdition.setSite(champSiteMission.getText().trim());
-
-            LocalDate dateDebut = datePickerDebutMission.getValue();
-            LocalTime heureDebut = LocalTime.parse(champHeureDebutMission.getText(), java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-            missionEnCoursEdition.setDateDebutMission(LocalDateTime.of(dateDebut, heureDebut));
-
-            if (datePickerFinMissionPrevue.getValue() != null && !champHeureFinMissionPrevue.getText().trim().isEmpty()) {
-                LocalDate dateFinPrevue = datePickerFinMissionPrevue.getValue();
-                LocalTime heureFinPrevue = LocalTime.parse(champHeureFinMissionPrevue.getText(), java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-                missionEnCoursEdition.setDateFinMission(LocalDateTime.of(dateFinPrevue, heureFinPrevue)); // Pour la date de fin *prévue*
-            } else {
-                missionEnCoursEdition.setDateFinMission(null); // Pas de date de fin prévue explicitement
-            }
-
-            missionEnCoursEdition.setKmPrevu(champKmPrevuMission.getText().isEmpty() ? null : Integer.parseInt(champKmPrevuMission.getText()));
-            missionEnCoursEdition.setCircuitMission(textAreaCircuitMission.getText());
-            missionEnCoursEdition.setObservationMission(textAreaObservationMission.getText());
-            // Le statut est géré par BusinessLogicService (PLANIFIEE par défaut à la création)
-
-            if (modeCreation) {
-                serviceLogiqueMetier.planifierNouvelleMission(missionEnCoursEdition);
-                FORM_MISSION_LOGGER.info("Nouvelle mission planifiée avec succès : " + missionEnCoursEdition.getLibMission());
-                afficherNotificationAlerteFormulaire("Planification Réussie", "La nouvelle mission a été planifiée avec succès.", Alert.AlertType.INFORMATION);
-            } else {
-                // S'assurer que le statut n'est pas modifié ici si ce n'est pas l'intention
-                // La modification d'une mission planifiée ne change généralement pas son statut (reste PLANIFIEE)
-                missionEnCoursEdition.setStatus(StatutMission.PLANIFIEE); // Redondant si déjà planifiée, mais sûr
-                serviceLogiqueMetier.modifierMissionPlanifiee(missionEnCoursEdition); // Méthode à créer dans BusinessLogicService
-                FORM_MISSION_LOGGER.info("Mission ID " + missionEnCoursEdition.getIdMission() + " modifiée avec succès.");
-                afficherNotificationAlerteFormulaire("Modification Réussie", "Les informations de la mission ont été mises à jour.", Alert.AlertType.INFORMATION);
-            }
-            fermerFormulaire();
-
+            actionAnnulerEtFermer();
         } catch (ErreurValidation | ErreurLogiqueMetier e) {
-            FORM_MISSION_LOGGER.log(Level.WARNING, "Échec de la sauvegarde de la mission : " + e.getMessage(), e);
-            afficherNotificationAlerteFormulaire("Échec de la Sauvegarde", e.getMessage(), Alert.AlertType.WARNING);
-        } catch (NumberFormatException e) {
-            FORM_MISSION_LOGGER.log(Level.WARNING, "Erreur de format numérique lors de la sauvegarde de la mission : " + e.getMessage(), e);
-            afficherNotificationAlerteFormulaire("Erreur de Format Numérique", "Veuillez vérifier le champ de kilométrage prévu.", Alert.AlertType.ERROR);
-        } catch (java.time.format.DateTimeParseException e) {
-            FORM_MISSION_LOGGER.log(Level.WARNING, "Erreur de format d'heure lors de la sauvegarde de la mission : " + e.getMessage(), e);
-            afficherNotificationAlerteFormulaire("Erreur de Format d'Heure", "Veuillez utiliser le format HH:mm pour les heures (ex: 09:30).", Alert.AlertType.ERROR);
-        }
-        catch (Exception e) {
-            FORM_MISSION_LOGGER.log(Level.SEVERE, "Erreur système inattendue lors de la sauvegarde de la mission.", e);
-            afficherNotificationAlerteFormulaire("Erreur Système", "Une erreur imprévue est survenue : " + e.getMessage(), Alert.AlertType.ERROR);
+            CONTROLEUR_FORM_MISSION_LOGGER.log(Level.WARNING, "Erreur de validation/logique métier lors de l'enregistrement de la mission.", e);
+            afficherNotificationAlerteInterface("Échec Enregistrement Mission", e.getMessage(), Alert.AlertType.ERROR);
+        } catch (Exception e) {
+            CONTROLEUR_FORM_MISSION_LOGGER.log(Level.SEVERE, "Erreur inattendue lors de l'enregistrement de la mission.", e);
+            afficherNotificationAlerteInterface("Erreur Système", "Une erreur imprévue est survenue: " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
-    private boolean validerSaisiesFormulaireMission() {
-        StringBuilder messagesErreur = new StringBuilder();
-
-        if (champLibelleMission.getText() == null || champLibelleMission.getText().trim().isEmpty()) {
-            messagesErreur.append("Le libellé de la mission est requis.\n");
-        }
-        if (choiceBoxVehiculeMission.getValue() == null) {
-            messagesErreur.append("Un véhicule doit être sélectionné.\n");
-        }
-        if (datePickerDebutMission.getValue() == null) {
-            messagesErreur.append("La date de début de mission est requise.\n");
-        }
-        if (champHeureDebutMission.getText() == null || champHeureDebutMission.getText().trim().isEmpty() || !champHeureDebutMission.getText().matches("^([01]\\d|2[0-3]):([0-5]\\d)$")) {
-            messagesErreur.append("L'heure de début de mission est requise au format HH:mm.\n");
-        }
-        if (!champHeureFinMissionPrevue.getText().trim().isEmpty() && !champHeureFinMissionPrevue.getText().matches("^([01]\\d|2[0-3]):([0-5]\\d)$")){
-            messagesErreur.append("L'heure de fin prévue doit être au format HH:mm si renseignée.\n");
-        }
-
-        if (datePickerFinMissionPrevue.getValue() != null && datePickerDebutMission.getValue() != null && datePickerFinMissionPrevue.getValue().isBefore(datePickerDebutMission.getValue())){
-            messagesErreur.append("La date de fin prévue ne peut être antérieure à la date de début.\n");
-        } else if (datePickerFinMissionPrevue.getValue() != null && datePickerDebutMission.getValue() != null && datePickerFinMissionPrevue.getValue().isEqual(datePickerDebutMission.getValue())) {
-            if (!champHeureDebutMission.getText().trim().isEmpty() && !champHeureFinMissionPrevue.getText().trim().isEmpty() &&
-                    LocalTime.parse(champHeureFinMissionPrevue.getText()).isBefore(LocalTime.parse(champHeureDebutMission.getText()))) {
-                messagesErreur.append("L'heure de fin prévue ne peut être antérieure à l'heure de début si les dates sont identiques.\n");
-            }
-        }
-
-
-        try { if (!champKmPrevuMission.getText().trim().isEmpty()) Integer.parseInt(champKmPrevuMission.getText().trim()); }
-        catch (NumberFormatException e) { messagesErreur.append("Le kilométrage prévu doit être un entier valide.\n"); }
-
-        if (messagesErreur.length() > 0) {
-            afficherNotificationAlerteFormulaire("Erreurs de Validation de Saisie", messagesErreur.toString(), Alert.AlertType.WARNING);
-            return false;
-        }
-        return true;
-    }
 
     @FXML
-    private void actionAnnulerFormulaire() {
-        FORM_MISSION_LOGGER.fine("Action annuler formulaire mission.");
-        fermerFormulaire();
-    }
-
-    private void fermerFormulaire() {
-        Stage stage = (Stage) boutonAnnulerFormulaireMission.getScene().getWindow();
+    private void actionAnnulerEtFermer() {
+        Stage stage = (Stage) boutonAnnulerMissionForm.getScene().getWindow();
         stage.close();
-        FORM_MISSION_LOGGER.info("Formulaire mission fermé.");
     }
 
-    private void afficherNotificationAlerteFormulaire(String titre, String message, Alert.AlertType typeAlerte) {
+    private void afficherNotificationAlerteInterface(String titre, String message, Alert.AlertType typeAlerte) {
         Alert alerte = new Alert(typeAlerte);
         alerte.setTitle(titre);
         alerte.setHeaderText(null);
         alerte.setContentText(message);
-        Stage stageProprietaire = (Stage) boutonAnnulerFormulaireMission.getScene().getWindow();
-        if (stageProprietaire != null) {
+        Stage stageProprietaire = (Stage) champLibelleMissionForm.getScene().getWindow();
+        if (stageProprietaire != null && stageProprietaire.isShowing()) {
             alerte.initOwner(stageProprietaire);
         }
         alerte.showAndWait();

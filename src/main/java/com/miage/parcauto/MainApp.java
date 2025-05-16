@@ -149,8 +149,7 @@ public class MainApp extends Application {
 
             securityManagerInstance = new SecurityManager(persistenceServiceInstance);
             APPLICATION_LOGGER.fine("SecurityManager instancié.");
-
-            businessLogicServiceInstance = new BusinessLogicService(persistenceServiceInstance);
+            
             APPLICATION_LOGGER.fine("BusinessLogicService instancié.");
 
             reportingEngineInstance = new ReportingEngine(persistenceServiceInstance);

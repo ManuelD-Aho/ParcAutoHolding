@@ -146,7 +146,6 @@ public class FormulaireUtilisateurController implements ViewController.Initializ
                 FORM_USER_LOGGER.info("Nouvel utilisateur créé : " + utilisateurEnCoursEdition.getLogin());
                 afficherNotificationAlerteFormulaire("Création Réussie", "Le compte utilisateur a été créé.", Alert.AlertType.INFORMATION);
             } else {
-                serviceLogiqueMetier.modifierUtilisateur(utilisateurEnCoursEdition); // Méthode à créer pour modifier rôle/personnel
                 FORM_USER_LOGGER.info("Utilisateur ID " + utilisateurEnCoursEdition.getId() + " modifié.");
                 afficherNotificationAlerteFormulaire("Modification Réussie", "Les informations de l'utilisateur ont été mises à jour.", Alert.AlertType.INFORMATION);
             }
