@@ -4,38 +4,45 @@ import main.java.com.miage.parcauto.AppModels.Utilisateur;
 import main.java.com.miage.parcauto.AppModels.RoleUtilisateur;
 
 public class SessionManager {
-    private static Utilisateur utilisateurConnecteActuellement;
+
+    private static Utilisateur utilisateurActuel;
 
     private SessionManager() {
-        // Constructeur privé pour empêcher l'instanciation, classe utilitaire statique.
     }
 
     public static void definirUtilisateurActuel(Utilisateur utilisateur) {
-        utilisateurConnecteActuellement = utilisateur;
+        utilisateurActuel = utilisateur;
     }
 
     public static Utilisateur obtenirUtilisateurActuel() {
-        return utilisateurConnecteActuellement;
+        return utilisateurActuel;
     }
 
     public static void deconnecterUtilisateur() {
-        utilisateurConnecteActuellement = null;
+        utilisateurActuel = null;
     }
 
     public static boolean estUtilisateurConnecte() {
-        return utilisateurConnecteActuellement != null;
+        return utilisateurActuel != null;
     }
 
     public static RoleUtilisateur obtenirRoleUtilisateurActuel() {
-        if (estUtilisateurConnecte()) {
-            return utilisateurConnecteActuellement.getRole();
+        return estUtilisateurConnecte() ? utilisateurActuel.getRole() : null;
+    }
+
+    public static Integer obtenirIdPersonnelUtilisateurActuel() {
+        if (estUtilisateurConnecte() && utilisateurActuel.getIdPersonnel() != null) {
+            return utilisateurActuel.getIdPersonnel();
         }
         return null;
     }
 
-    public static Integer obtenirIdPersonnelUtilisateurActuel() {
-        if (estUtilisateurConnecte() && utilisateurConnecteActuellement.getIdPersonnel() != null) {
-            return utilisateurConnecteActuellement.getIdPersonnel();
+    public static Integer obtenirIdSocietaireUtilisateurActuel(PersistenceService persistenceService) {
+        if (estUtilisateurConnecte() && utilisateurActuel.getRole() == RoleUtilisateur.U3 && utilisateurActuel.getIdPersonnel() != null) {
+            AppModels.SocietaireCompte compte = persistenceService.trouverSocietaireCompteParIdPersonnel(utilisateurActuel.getIdPersonnel());
+            if (compte != null) {
+                return compte.getIdSocietaire();
+            }
         }
         return null;
     }

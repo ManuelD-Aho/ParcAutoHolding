@@ -40,7 +40,7 @@ public class MainApp extends Application {
     private static ReportingEngine reportingEngineInstance;
     private static Object controleurActif;
 
-    private static final String PACKAGE_FXML_BASE = "/main/java/com/miage/parcauto/fxml/";
+    private static final String PACKAGE_FXML_BASE = "/com/miage/parcauto/fxml/";
     private static final String DOSSIER_LOGS = "logs";
     private static final Logger APPLICATION_LOGGER = Logger.getLogger("main.java.com.miage.parcauto");
 
@@ -52,12 +52,14 @@ public class MainApp extends Application {
             }
 
             SimpleDateFormat formatNomFichier = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-            String nomFichierLog = cheminDossierLogs.resolve("ParcAutoApplication_" + formatNomFichier.format(new Date()) + ".log").toString();
+            String nomFichierLog = cheminDossierLogs
+                    .resolve("ParcAutoApplication_" + formatNomFichier.format(new Date()) + ".log").toString();
 
             FileHandler fileHandler = new FileHandler(nomFichierLog, true);
 
             Formatter customFormatter = new Formatter() {
                 private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
                 @Override
                 public String format(LogRecord record) {
                     StringBuilder sb = new StringBuilder();
@@ -74,12 +76,11 @@ public class MainApp extends Application {
                     sb.append(System.lineSeparator());
                     if (record.getThrown() != null) {
                         try (StringWriter sw = new StringWriter();
-                             PrintWriter pw = new PrintWriter(sw)) {
+                                PrintWriter pw = new PrintWriter(sw)) {
                             record.getThrown().printStackTrace(pw);
                             sb.append(sw.toString());
                             sb.append(System.lineSeparator());
                         } catch (Exception ex) {
-                            // Ne devrait pas arriver
                         }
                     }
                     return sb.toString();
@@ -101,11 +102,11 @@ public class MainApp extends Application {
             APPLICATION_LOGGER.info("Système de journalisation initialisé. Logs vers: " + nomFichierLog);
 
         } catch (IOException e) {
-            System.err.println("ERREUR CRITIQUE : Impossible d'initialiser le système de journalisation : " + e.getMessage());
+            System.err.println(
+                    "ERREUR CRITIQUE : Impossible d'initialiser le système de journalisation : " + e.getMessage());
             e.printStackTrace(System.err);
         }
     }
-
 
     @Override
     public void start(Stage stage) {
@@ -124,7 +125,8 @@ public class MainApp extends Application {
             APPLICATION_LOGGER.log(Level.SEVERE, "Erreur fatale lors du démarrage: " + e.getMessage(), e);
             afficherNotificationCritique("Erreur Fatale au Démarrage",
                     "Une défaillance majeure empêche le lancement.",
-                    "Consultez les logs dans '" + DOSSIER_LOGS + "'.\nCause: " + e.getClass().getSimpleName() + " - " + e.getMessage() +
+                    "Consultez les logs dans '" + DOSSIER_LOGS + "'.\nCause: " + e.getClass().getSimpleName() + " - "
+                            + e.getMessage() +
                             "\nL'application va se terminer.");
             Platform.exit();
             System.exit(1);
@@ -149,16 +151,50 @@ public class MainApp extends Application {
 
             securityManagerInstance = new SecurityManager(persistenceServiceInstance);
             APPLICATION_LOGGER.fine("SecurityManager instancié.");
-            
+
+            businessLogicServiceInstance = new BusinessLogicService(persistenceServiceInstance,
+                    securityManagerInstance);
             APPLICATION_LOGGER.fine("BusinessLogicService instancié.");
 
             reportingEngineInstance = new ReportingEngine(persistenceServiceInstance);
             APPLICATION_LOGGER.fine("ReportingEngine instancié.");
 
+            // --- AJOUT : Création des utilisateurs par défaut si absents ---
+            try {
+                creerUtilisateurDefautSiAbsent("Util1", AppModels.RoleUtilisateur.U1);
+                creerUtilisateurDefautSiAbsent("Util2", AppModels.RoleUtilisateur.U2);
+                creerUtilisateurDefautSiAbsent("Util3", AppModels.RoleUtilisateur.U3);
+                creerUtilisateurDefautSiAbsent("AdminSystem", AppModels.RoleUtilisateur.U4);
+            } catch (Exception e) {
+                APPLICATION_LOGGER.log(Level.SEVERE, "Erreur lors de la création des utilisateurs par défaut.", e);
+            }
+            // --- FIN AJOUT ---
+
             APPLICATION_LOGGER.info("Tous les services principaux initialisés.");
         } catch (Exception e) {
             APPLICATION_LOGGER.log(Level.SEVERE, "Échec initialisation services fondamentaux.", e);
             throw new RuntimeException("Impossible d'initialiser l'infrastructure applicative.", e);
+        }
+    }
+
+    // --- AJOUT : Méthode utilitaire pour créer un utilisateur par défaut si absent
+    // ---
+    private void creerUtilisateurDefautSiAbsent(String login, AppModels.RoleUtilisateur role) {
+        if (persistenceServiceInstance.trouverUtilisateurParLogin(login) == null) {
+            AppModels.Utilisateur utilisateur = new AppModels.Utilisateur();
+            utilisateur.setLogin(login);
+            utilisateur.setRole(role);
+            utilisateur.setIdPersonnel(null);
+            utilisateur.setMfaSecret(null);
+            try {
+                businessLogicServiceInstance.creerNouvelUtilisateur(utilisateur, "test123");
+                APPLICATION_LOGGER.info(
+                        "Utilisateur par défaut créé : " + login + " (rôle : " + role.getLibelleInterface() + ")");
+            } catch (Exception e) {
+                APPLICATION_LOGGER.log(Level.SEVERE, "Impossible de créer l'utilisateur par défaut '" + login + "'", e);
+            }
+        } else {
+            APPLICATION_LOGGER.fine("Utilisateur par défaut déjà existant : " + login);
         }
     }
 
@@ -180,16 +216,16 @@ public class MainApp extends Application {
         Parent racineInterface = chargeurFXML.load();
 
         Object controleurObtenu = chargeurFXML.getController();
-        if (controleurObtenu instanceof ViewController) { // ViewController gère aussi LoginView
+        if (controleurObtenu instanceof ViewController) {
             ((ViewController) controleurObtenu).injecterDependancesServices(
                     businessLogicServiceInstance,
                     securityManagerInstance,
                     reportingEngineInstance,
-                    persistenceServiceInstance
-            );
+                    persistenceServiceInstance);
             APPLICATION_LOGGER.fine("Services injectés dans le contrôleur de LoginView.");
         } else {
-            APPLICATION_LOGGER.warning("Contrôleur de LoginView.fxml type incorrect: " + (controleurObtenu != null ? controleurObtenu.getClass().getName() : "null"));
+            APPLICATION_LOGGER.warning("Contrôleur de LoginView.fxml type incorrect: "
+                    + (controleurObtenu != null ? controleurObtenu.getClass().getName() : "null"));
         }
         controleurActif = controleurObtenu;
 
@@ -216,16 +252,16 @@ public class MainApp extends Application {
                     businessLogicServiceInstance,
                     securityManagerInstance,
                     reportingEngineInstance,
-                    persistenceServiceInstance
-            );
+                    persistenceServiceInstance);
             APPLICATION_LOGGER.fine("Services injectés dans le contrôleur de MainDashboardView.");
             Platform.runLater(() -> {
-                vc.initialiserInterfacePrincipaleApresConnexion(); // Nom de méthode mis à jour
+                vc.initialiserInterfacePrincipaleApresConnexion();
                 APPLICATION_LOGGER.fine("initialiserInterfacePrincipaleApresConnexion appelée pour MainDashboardView.");
             });
         } else {
             String nomClasseControleur = (controleurObtenu != null) ? controleurObtenu.getClass().getName() : "null";
-            APPLICATION_LOGGER.severe("Erreur: Contrôleur de MainDashboardView.fxml (" + nomClasseControleur + ") n'est pas instance de ViewController.");
+            APPLICATION_LOGGER.severe("Erreur: Contrôleur de MainDashboardView.fxml (" + nomClasseControleur
+                    + ") n'est pas instance de ViewController.");
             throw new IllegalStateException("Contrôleur principal de type incorrect: " + nomClasseControleur);
         }
         controleurActif = controleurObtenu;
@@ -241,7 +277,7 @@ public class MainApp extends Application {
         APPLICATION_LOGGER.info("Interface principale affichée.");
     }
 
-    public static Stage getPrimaryStage(){
+    public static Stage getPrimaryStage() {
         return primaryStageInstance;
     }
 

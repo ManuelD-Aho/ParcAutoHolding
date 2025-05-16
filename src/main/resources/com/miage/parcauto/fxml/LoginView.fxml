@@ -10,15 +10,15 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" spacing="20.0" style="-fx-background-color: #EAF2F8;" prefHeight="500.0" prefWidth="550.0" stylesheets="@../css/login-theme.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
+<VBox alignment="CENTER" spacing="20.0" style="-fx-background-color: #EAF2F8;" prefHeight="500.0" prefWidth="550.0" stylesheets="@../css/login-theme.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
     <padding>
         <Insets bottom="50.0" left="50.0" right="50.0" top="50.0" />
     </padding>
 
     <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
         <image>
-            <!-- Remplacer par le chemin réel vers votre logo -->
-            <!-- <Image url="@../images/logo_miage_holding.png" /> -->
+            <!-- Image de logo commentée pour l'instant, décommentez et ajustez le chemin si nécessaire -->
+            <Image url="@../images/logo-parcauto.png" />
         </image>
         <VBox.margin>
             <Insets bottom="15.0" />
@@ -47,12 +47,18 @@
         <TextField fx:id="champLoginUtilisateur" promptText="Saisissez votre identifiant" styleClass="champ-texte-login" />
 
         <Label text="Mot de Passe :" styleClass="label-champ-login">
-            <VBox.margin><Insets top="10.0" /></VBox.margin>
+            <VBox.margin>
+                <Insets top="10.0" />
+            </VBox.margin>
         </Label>
         <PasswordField fx:id="champMotDePasseUtilisateur" promptText="Saisissez votre mot de passe" styleClass="champ-texte-login" onAction="#actionAuthentificationUtilisateur" />
     </VBox>
 
-    <Label fx:id="labelMessageErreurLogin" styleClass="message-erreur-login" VBox.margin="\Insets{top=10.0}"/>
+    <Label fx:id="labelMessageErreurLogin" styleClass="message-erreur-login">
+        <VBox.margin>
+            <Insets top="10.0" />
+        </VBox.margin>
+    </Label>
 
     <Button fx:id="boutonSeConnecterLoginView" text="Se Connecter" onAction="#actionAuthentificationUtilisateur" styleClass="bouton-connexion-login" prefWidth="200.0" prefHeight="45.0">
         <VBox.margin>
