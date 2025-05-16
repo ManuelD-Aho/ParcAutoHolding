@@ -1,0 +1,187 @@
+/* ========== STYLES AVANCÉS POUR LES TABLEAUX DE DONNÉES ========== */
+
+/* Conteneur de tableau avec titre et actions */
+.tableau-conteneur {
+    -fx-background-color: white;
+    -fx-background-radius: 5px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 5px;
+    -fx-padding: 0;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+
+.tableau-entete {
+    -fx-background-color: -fx-primary-color-light;
+    -fx-background-radius: 5px 5px 0 0;
+    -fx-padding: 10 15 10 15;
+    -fx-border-color: transparent transparent -fx-mid-gray transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tableau-titre {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-darker-gray;
+}
+
+.tableau-actions {
+    -fx-spacing: 5;
+    -fx-alignment: CENTER_RIGHT;
+}
+
+.tableau-filtres {
+    -fx-padding: 10;
+    -fx-spacing: 10;
+    -fx-background-color: derive(-fx-light-gray, 30%);
+    -fx-border-color: transparent transparent -fx-mid-gray transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* Style pour le tableau lui-même */
+.tableau-donnees {
+    -fx-background-color: white;
+    -fx-background-radius: 0 0 4px 4px;
+    -fx-padding: 0;
+}
+
+.tableau-donnees .column-header-background {
+    -fx-background-color: -fx-primary-color-light;
+    -fx-padding: 0 0 5 0;
+}
+
+.tableau-donnees .column-header, .tableau-donnees .filler {
+    -fx-background-color: transparent;
+    -fx-size: 35px;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: -fx-mid-gray;
+}
+
+.tableau-donnees .column-header .label {
+    -fx-text-fill: -fx-darker-gray;
+    -fx-font-weight: bold;
+    -fx-padding: 10 5 10 5;
+    -fx-alignment: CENTER-LEFT;
+}
+
+.tableau-donnees .column-header .arrow {
+    -fx-background-color: -fx-primary-color-dark;
+}
+
+.tableau-donnees .table-cell {
+    -fx-padding: 8 5 8 5;
+    -fx-border-color: transparent -fx-light-gray transparent transparent;
+}
+
+.tableau-donnees .table-row-cell {
+    -fx-background-color: white;
+}
+
+.tableau-donnees .table-row-cell:odd {
+    -fx-background-color: derive(-fx-light-gray, 30%);
+}
+
+.tableau-donnees .table-row-cell:selected {
+    -fx-background-color: derive(-fx-primary-color, 80%);
+    -fx-text-fill: -fx-dark-gray;
+}
+
+.tableau-donnees .table-row-cell:selected .table-cell {
+    -fx-text-fill: -fx-darker-gray;
+}
+
+.tableau-donnees .placeholder {
+    -fx-background-color: white;
+    -fx-text-fill: derive(-fx-dark-gray, 30%);
+    -fx-font-size: 14px;
+}
+
+/* Pagination sous le tableau */
+.tableau-pagination {
+    -fx-background-color: derive(-fx-light-gray, 20%);
+    -fx-padding: 5 10 5 10;
+    -fx-border-color: -fx-mid-gray transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.tableau-pagination .pagination {
+    -fx-page-information-visible: false;
+}
+
+.tableau-pagination .pagination .page {
+    -fx-padding: 0;
+}
+
+.tableau-pagination .pagination .button {
+    -fx-background-color: transparent;
+    -fx-padding: 5 10 5 10;
+}
+
+.tableau-pagination .pagination .button:hover {
+    -fx-background-color: -fx-primary-color-light;
+}
+
+.tableau-pagination .pagination .page-number {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+.tableau-pagination .pagination .page-number:hover {
+    -fx-background-color: -fx-primary-color-light;
+}
+
+.tableau-pagination .pagination .page-number:selected {
+    -fx-background-color: -fx-primary-color;
+    -fx-text-fill: white;
+}
+
+/* Styles pour les cellules spéciales */
+.tableau-donnees .cell-date {
+    -fx-alignment: CENTER;
+}
+
+.tableau-donnees .cell-numeric {
+    -fx-alignment: CENTER-RIGHT;
+}
+
+.tableau-donnees .cell-statut-actif {
+    -fx-text-fill: -fx-success-color;
+    -fx-font-weight: bold;
+}
+
+.tableau-donnees .cell-statut-inactif {
+    -fx-text-fill: -fx-error-color;
+    -fx-font-weight: bold;
+}
+
+.tableau-donnees .cell-statut-en-attente {
+    -fx-text-fill: -fx-warning-color;
+    -fx-font-weight: bold;
+}
+
+/* Boutons d'actions dans les lignes */
+.tableau-donnees .cell-boutons-actions {
+    -fx-alignment: CENTER;
+}
+
+.bouton-action-tableau {
+    -fx-background-color: transparent;
+    -fx-padding: 3 5 3 5;
+    -fx-cursor: hand;
+    -fx-alignment: CENTER;
+}
+
+.bouton-action-tableau:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.05);
+}
+
+.bouton-action-tableau.editer {
+    -fx-graphic: url('icons/edit.png');
+}
+
+.bouton-action-tableau.supprimer {
+    -fx-graphic: url('icons/delete.png');
+}
+
+.bouton-action-tableau.details {
+    -fx-graphic: url('icons/details.png');
+}

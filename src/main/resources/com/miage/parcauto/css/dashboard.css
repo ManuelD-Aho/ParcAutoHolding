@@ -1,0 +1,214 @@
+/* ========== STYLES POUR LE TABLEAU DE BORD ========== */
+
+/* Conteneur principal du tableau de bord */
+.dashboard-conteneur {
+    -fx-background-color: -fx-lightest-gray;
+    -fx-padding: 20;
+    -fx-spacing: 20;
+}
+
+.dashboard-titre {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-darker-gray;
+}
+
+.dashboard-date {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+/* Cartes d'indicateurs clés */
+.dashboard-kpi-conteneur {
+    -fx-spacing: 20;
+    -fx-alignment: CENTER;
+}
+
+.dashboard-kpi-carte {
+    -fx-background-color: white;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 6, 0, 0, 2);
+    -fx-padding: 15;
+    -fx-min-width: 200px;
+    -fx-alignment: CENTER;
+}
+
+.dashboard-kpi-titre {
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-dark-gray;
+    -fx-padding: 0 0 5 0;
+}
+
+.dashboard-kpi-valeur {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-primary-color-dark;
+    -fx-padding: 5 0 5 0;
+}
+
+.dashboard-kpi-tendance {
+    -fx-font-size: 12px;
+    -fx-padding: 0 0 5 0;
+}
+
+.dashboard-kpi-tendance-positive {
+    -fx-text-fill: -fx-success-color;
+}
+
+.dashboard-kpi-tendance-negative {
+    -fx-text-fill: -fx-error-color;
+}
+
+.dashboard-kpi-description {
+    -fx-font-size: 12px;
+    -fx-text-fill: -fx-mid-gray;
+    -fx-wrap-text: true;
+}
+
+/* Sections des graphiques et tableaux résumés */
+.dashboard-section {
+    -fx-background-color: white;
+    -fx-background-radius: 8px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 8px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 6, 0, 0, 2);
+    -fx-padding: 15;
+}
+
+.dashboard-section-titre {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-darker-gray;
+    -fx-padding: 0 0 10 0;
+    -fx-border-color: transparent transparent -fx-light-gray transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* Styles pour les graphiques */
+.dashboard-chart-container {
+    -fx-padding: 10 0 10 0;
+}
+
+.dashboard-chart {
+    -fx-padding: 10;
+    -fx-background-color: transparent;
+}
+
+.dashboard-chart .chart-plot-background {
+    -fx-background-color: transparent;
+}
+
+.dashboard-chart .chart-vertical-grid-lines {
+    -fx-stroke: -fx-light-gray;
+    -fx-stroke-dash-array: 3 3;
+}
+
+.dashboard-chart .chart-horizontal-grid-lines {
+    -fx-stroke: -fx-light-gray;
+    -fx-stroke-dash-array: 3 3;
+}
+
+.dashboard-chart .chart-series-line {
+    -fx-stroke-width: 2px;
+}
+
+.dashboard-chart .chart-series-line.series0 {
+    -fx-stroke: -fx-primary-color;
+}
+
+.dashboard-chart .chart-series-line.series1 {
+    -fx-stroke: -fx-secondary-color;
+}
+
+.dashboard-chart .chart-series-line.series2 {
+    -fx-stroke: -fx-accent-color;
+}
+
+.dashboard-chart .chart-line-symbol {
+    -fx-background-color: white, white;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 5px;
+    -fx-padding: 5px;
+}
+
+.dashboard-chart .chart-line-symbol.series0 {
+    -fx-background-color: white, -fx-primary-color;
+}
+
+.dashboard-chart .chart-line-symbol.series1 {
+    -fx-background-color: white, -fx-secondary-color;
+}
+
+.dashboard-chart .chart-line-symbol.series2 {
+    -fx-background-color: white, -fx-accent-color;
+}
+
+/* Styles pour les listes résumées */
+.dashboard-liste-resumee {
+    -fx-background-color: transparent;
+    -fx-border-color: -fx-light-gray;
+    -fx-border-radius: 4px;
+}
+
+.dashboard-liste-resumee .list-cell {
+    -fx-padding: 8 10 8 10;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -fx-light-gray transparent;
+}
+
+.dashboard-liste-resumee .list-cell:hover {
+    -fx-background-color: derive(-fx-light-gray, 40%);
+}
+
+.dashboard-liste-resumee .list-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+/* Styles pour les alertes du tableau de bord */
+.dashboard-alerte {
+    -fx-background-color: derive(-fx-warning-color, 85%);
+    -fx-background-radius: 4px;
+    -fx-border-color: -fx-warning-color;
+    -fx-border-radius: 4px;
+    -fx-padding: 10;
+    -fx-spacing: 10;
+    -fx-alignment: CENTER_LEFT;
+}
+
+.dashboard-alerte .bouton-fermer {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-font-size: 14px;
+    -fx-text-fill: -fx-warning-color;
+    -fx-cursor: hand;
+}
+
+.dashboard-alerte.info {
+    -fx-background-color: derive(-fx-info-color, 85%);
+    -fx-border-color: -fx-info-color;
+}
+
+.dashboard-alerte.info .bouton-fermer {
+    -fx-text-fill: -fx-info-color;
+}
+
+.dashboard-alerte.erreur {
+    -fx-background-color: derive(-fx-error-color, 90%);
+    -fx-border-color: -fx-error-color;
+}
+
+.dashboard-alerte.erreur .bouton-fermer {
+    -fx-text-fill: -fx-error-color;
+}
+
+.dashboard-alerte.succes {
+    -fx-background-color: derive(-fx-success-color, 90%);
+    -fx-border-color: -fx-success-color;
+}
+
+.dashboard-alerte.succes .bouton-fermer {
+    -fx-text-fill: -fx-success-color;
+}

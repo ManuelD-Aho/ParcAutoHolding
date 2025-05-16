@@ -1,0 +1,106 @@
+/* ========== THÈME ÉCRAN DE CONNEXION - PARCAUTO MIAGE HOLDING ========== */
+
+/* Couleurs principales du thème */
+.root {
+    -fx-primary-color: #1976D2;            /* Bleu principal */
+    -fx-primary-color-dark: #0D47A1;       /* Bleu foncé - hover, focus */
+    -fx-secondary-color: #4CAF50;          /* Vert pour les actions positives */
+    -fx-accent-color: #E91E63;             /* Rose pour les accents importants */
+    -fx-light-gray: #EAF2F8;               /* Gris clair pour les fonds */
+    -fx-mid-gray: #B3B6B7;                 /* Gris moyen pour des éléments discrets */
+    -fx-dark-gray: #34495E;                /* Gris foncé pour le texte */
+    -fx-error-color: #E74C3C;              /* Rouge pour les erreurs */
+    -fx-success-color: #2ECC71;            /* Vert pour les succès */
+    -fx-warning-color: #F39C12;            /* Orange pour les avertissements */
+
+    -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    -fx-text-fill: -fx-dark-gray;
+    -fx-background-color: -fx-light-gray;
+    -fx-focus-color: -fx-primary-color;
+    -fx-faint-focus-color: derive(-fx-primary-color, 80%);
+}
+
+/* Style du titre principal de l'application dans l'écran de connexion */
+.titre-application-login {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-primary-color-dark;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 3, 0, 0, 1);
+}
+
+/* Style du sous-titre dans l'écran de connexion */
+.sous-titre-login {
+    -fx-font-size: 18px;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+/* Style des étiquettes des champs */
+.label-champ-login {
+    -fx-font-size: 14px;
+    -fx-font-weight: normal;
+    -fx-text-fill: -fx-dark-gray;
+    -fx-padding: 0 0 2 0;
+}
+
+/* Style des champs de texte et mot de passe */
+.champ-texte-login {
+    -fx-background-color: white;
+    -fx-background-radius: 4px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 4px;
+    -fx-font-size: 14px;
+    -fx-padding: 8 12 8 12;
+    -fx-prompt-text-fill: derive(-fx-dark-gray, 30%);
+}
+
+.champ-texte-login:focused {
+    -fx-border-color: -fx-primary-color;
+    -fx-background-color: white;
+    -fx-effect: dropshadow(three-pass-box, derive(-fx-primary-color, 40%), 3, 0, 0, 0);
+}
+
+/* Style du message d'erreur */
+.message-erreur-login {
+    -fx-text-fill: -fx-error-color;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 5 0 5 0;
+    -fx-wrap-text: true;
+}
+
+/* Style du bouton de connexion */
+.bouton-connexion-login {
+    -fx-background-color: -fx-primary-color;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-background-radius: 4px;
+    -fx-padding: 10 20 10 20;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 3, 0, 0, 1);
+}
+
+.bouton-connexion-login:hover {
+    -fx-background-color: derive(-fx-primary-color, -10%);
+}
+
+.bouton-connexion-login:pressed {
+    -fx-background-color: -fx-primary-color-dark;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 1, 0, 0, 0);
+}
+
+/* Style pour l'image du logo */
+.logo-application {
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 6, 0, 0, 3);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+.fade-in {
+    -fx-opacity: 0;
+    animation: fadeIn 0.5s ease-in forwards;
+}

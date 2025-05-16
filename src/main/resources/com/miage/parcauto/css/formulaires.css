@@ -1,0 +1,275 @@
+/* ========== STYLES SPÉCIFIQUES AUX FORMULAIRES DE PARCAUTO ========== */
+
+/* Conteneur principal de formulaires */
+.formulaire-conteneur {
+    -fx-background-color: white;
+    -fx-background-radius: 5px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 5px;
+    -fx-padding: 20;
+    -fx-spacing: 10;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+
+.formulaire-titre {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-darker-gray;
+    -fx-padding: 0 0 15 0;
+    -fx-border-color: transparent transparent -fx-mid-gray transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.formulaire-section {
+    -fx-padding: 10 0 10 0;
+    -fx-spacing: 5;
+}
+
+.formulaire-section-titre {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -fx-primary-color-dark;
+    -fx-padding: 0 0 5 0;
+}
+
+/* ===== Styles de champs de formulaire ===== */
+
+/* Label pour champs de formulaire */
+.formulaire-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: -fx-dark-gray;
+    -fx-padding: 5 0 2 0;
+}
+
+.formulaire-label-obligatoire:after {
+    -fx-text-fill: -fx-error-color;
+    -fx-content: " *";
+}
+
+/* Champ de texte */
+.formulaire-text-field {
+    -fx-background-color: white;
+    -fx-background-radius: 4px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 4px;
+    -fx-padding: 8 10 8 10;
+    -fx-font-size: 13px;
+}
+
+.formulaire-text-field:focused {
+    -fx-border-color: -fx-primary-color;
+    -fx-background-color: white;
+    -fx-effect: dropshadow(three-pass-box, derive(-fx-primary-color, 60%), 3, 0, 0, 0);
+}
+
+.formulaire-text-field-invalide {
+    -fx-border-color: -fx-error-color;
+}
+
+/* Champ numérique */
+.formulaire-numeric-field {
+    -fx-background-color: white;
+    -fx-background-radius: 4px;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 4px;
+    -fx-padding: 8 10 8 10;
+    -fx-font-size: 13px;
+    -fx-alignment: CENTER-RIGHT;
+}
+
+.formulaire-numeric-field:focused {
+    -fx-border-color: -fx-primary-color;
+    -fx-effect: dropshadow(three-pass-box, derive(-fx-primary-color, 60%), 3, 0, 0, 0);
+}
+
+/* Zone de texte multiligne */
+.formulaire-text-area {
+    -fx-background-color: white;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.formulaire-text-area:focused {
+    -fx-border-color: -fx-primary-color;
+}
+
+.formulaire-text-area .content {
+    -fx-background-color: white;
+    -fx-background-radius: 4px;
+    -fx-padding: 5;
+}
+
+/* ComboBox et ChoiceBox */
+.formulaire-combo-box,
+.formulaire-choice-box {
+    -fx-background-color: white;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.formulaire-combo-box:focused,
+.formulaire-choice-box:focused {
+    -fx-border-color: -fx-primary-color;
+}
+
+.formulaire-combo-box .list-cell,
+.formulaire-choice-box .list-cell {
+    -fx-padding: 5 8 5 8;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+.formulaire-combo-box .list-view,
+.formulaire-choice-box .list-view {
+    -fx-background-color: white;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 0 0 4px 4px;
+    -fx-background-radius: 0 0 4px 4px;
+}
+
+.formulaire-combo-box .list-view .list-cell:hover,
+.formulaire-choice-box .list-view .list-cell:hover {
+    -fx-background-color: -fx-primary-color-light;
+}
+
+.formulaire-combo-box .list-view .list-cell:filled:selected,
+.formulaire-choice-box .list-view .list-cell:filled:selected {
+    -fx-background-color: derive(-fx-primary-color, 50%);
+}
+
+/* DatePicker */
+.formulaire-date-picker {
+    -fx-background-color: white;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-size: 13px;
+}
+
+.formulaire-date-picker:focused {
+    -fx-border-color: -fx-primary-color;
+}
+
+.formulaire-date-picker .text-field {
+    -fx-background-color: white;
+    -fx-border-color: transparent;
+    -fx-padding: 5 8 5 8;
+}
+
+.formulaire-date-picker .arrow-button {
+    -fx-background-color: -fx-primary-color-light;
+    -fx-background-radius: 0 4px 4px 0;
+}
+
+.formulaire-date-picker .arrow-button:hover {
+    -fx-background-color: derive(-fx-primary-color-light, -10%);
+}
+
+.formulaire-date-picker .arrow-button .arrow {
+    -fx-background-color: -fx-primary-color-dark;
+}
+
+.formulaire-date-picker .calendar-grid {
+    -fx-background-color: white;
+}
+
+.formulaire-date-picker .day-cell {
+    -fx-background-color: white;
+    -fx-border-color: -fx-light-gray;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+.formulaire-date-picker .day-cell:hover {
+    -fx-background-color: -fx-primary-color-light;
+}
+
+.formulaire-date-picker .selected {
+    -fx-background-color: -fx-primary-color;
+    -fx-text-fill: white;
+}
+
+/* CheckBox */
+.formulaire-check-box {
+    -fx-font-size: 13px;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+.formulaire-check-box .box {
+    -fx-background-color: white;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 3px;
+}
+
+.formulaire-check-box:selected .box {
+    -fx-background-color: -fx-primary-color;
+    -fx-border-color: -fx-primary-color;
+}
+
+.formulaire-check-box:selected .mark {
+    -fx-background-color: white;
+}
+
+/* RadioButton */
+.formulaire-radio-button {
+    -fx-font-size: 13px;
+    -fx-text-fill: -fx-dark-gray;
+}
+
+.formulaire-radio-button .radio {
+    -fx-background-color: white;
+    -fx-border-color: -fx-mid-gray;
+    -fx-border-radius: 10px;
+}
+
+.formulaire-radio-button:selected .radio {
+    -fx-background-color: -fx-primary-color;
+    -fx-border-color: -fx-primary-color;
+}
+
+.formulaire-radio-button:selected .dot {
+    -fx-background-color: white;
+}
+
+/* Message d'erreur de validation */
+.formulaire-erreur-message {
+    -fx-text-fill: -fx-error-color;
+    -fx-font-size: 12px;
+    -fx-padding: 2 0 0 2;
+}
+
+/* Boutons de formulaire */
+.formulaire-bouton-conteneur {
+    -fx-padding: 15 0 5 0;
+    -fx-spacing: 10;
+    -fx-alignment: CENTER_RIGHT;
+    -fx-border-color: -fx-light-gray transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.formulaire-bouton-annuler {
+    -fx-background-color: derive(-fx-mid-gray, 30%);
+    -fx-text-fill: -fx-dark-gray;
+    -fx-font-size: 13px;
+    -fx-padding: 8 15 8 15;
+    -fx-background-radius: 4px;
+}
+
+.formulaire-bouton-annuler:hover {
+    -fx-background-color: -fx-mid-gray;
+}
+
+.formulaire-bouton-valider {
+    -fx-background-color: -fx-primary-color;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-padding: 8 15 8 15;
+    -fx-background-radius: 4px;
+}
+
+.formulaire-bouton-valider:hover {
+    -fx-background-color: derive(-fx-primary-color, -10%);
+}

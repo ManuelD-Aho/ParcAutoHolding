@@ -1,0 +1,12 @@
+/* Fichier d'importation principal qui rassemble tous les styles */
+
+/* Styles de base */
+@import "theme-default.css";
+
+/* Styles spécifiques */
+@import "login-theme.css";
+@import "formulaires.css";
+@import "tableaux.css";
+@import "dashboard.css";
+
+/* Ajoutez ici d'autres imports si nécessaire */
