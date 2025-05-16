@@ -8,62 +8,55 @@
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" spacing="20.0" style="-fx-background-color: #F0F4F8;" prefHeight="450.0" prefWidth="500.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
+<VBox alignment="CENTER" spacing="20.0" style="-fx-background-color: #EAF2F8;" prefHeight="500.0" prefWidth="550.0" stylesheets="@../css/login-theme.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
     <padding>
-        <Insets bottom="40.0" left="40.0" right="40.0" top="40.0" />
+        <Insets bottom="50.0" left="50.0" right="50.0" top="50.0" />
     </padding>
 
-    <ImageView fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
+    <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
         <image>
-            <!-- Vous devrez placer une image de logo ici, par exemple logo_miage.png dans le même dossier ou un sous-dossier resources/images -->
-            <!-- <Image url="@../images/logo_miage.png" /> -->
+            <!-- Remplacer par le chemin réel vers votre logo -->
+            <!-- <Image url="@../images/logo_miage_holding.png" /> -->
         </image>
         <VBox.margin>
-            <Insets bottom="10.0" />
+            <Insets bottom="15.0" />
         </VBox.margin>
     </ImageView>
 
-    <Label text="ParcAuto MIAGE Holding" textFill="#2C3E50">
+    <Label text="ParcAuto MIAGE Holding" styleClass="titre-application-login">
         <font>
-            <Font name="System Bold" size="24.0" />
+            <Font name="System Bold" size="26.0" />
         </font>
         <VBox.margin>
-            <Insets bottom="5.0" />
+            <Insets bottom="10.0" />
         </VBox.margin>
     </Label>
-    <Label text="Authentification Requise" textFill="#34495E">
+    <Label text="Authentification Requise" styleClass="sous-titre-login">
         <font>
-            <Font size="16.0" />
+            <Font size="18.0" />
         </font>
         <VBox.margin>
-            <Insets bottom="20.0" />
+            <Insets bottom="25.0" />
         </VBox.margin>
     </Label>
 
-    <VBox spacing="15.0" maxWidth="300.0">
-        <Label text="Identifiant (Login) :" textFill="#5D6D7E">
-            <font><Font size="13.0" /></font>
-        </Label>
-        <TextField fx:id="champLogin" promptText="Entrez votre login" style="-fx-font-size: 14px; -fx-border-color: #BDC3C7; -fx-border-radius: 5;" />
+    <VBox spacing="15.0" maxWidth="350.0" alignment="CENTER_LEFT">
+        <Label text="Identifiant (Login) :" styleClass="label-champ-login"/>
+        <TextField fx:id="champLoginUtilisateur" promptText="Saisissez votre identifiant" styleClass="champ-texte-login" />
 
-        <Label text="Mot de Passe :" textFill="#5D6D7E">
-            <font><Font size="13.0" /></font>
+        <Label text="Mot de Passe :" styleClass="label-champ-login">
             <VBox.margin><Insets top="10.0" /></VBox.margin>
         </Label>
-        <PasswordField fx:id="champMotDePasse" promptText="Entrez votre mot de passe" style="-fx-font-size: 14px; -fx-border-color: #BDC3C7; -fx-border-radius: 5;" onAction="#actionSeConnecter" />
+        <PasswordField fx:id="champMotDePasseUtilisateur" promptText="Saisissez votre mot de passe" styleClass="champ-texte-login" onAction="#actionAuthentificationUtilisateur" />
     </VBox>
 
-    <Label fx:id="labelMessageErreurLogin" style="-fx-text-fill: #E74C3C; -fx-font-weight: bold;" VBox.margin="\Insets{top=5.0}"/>
+    <Label fx:id="labelMessageErreurLogin" styleClass="message-erreur-login" VBox.margin="\Insets{top=10.0}"/>
 
-    <Button fx:id="boutonSeConnecter" text="Se Connecter" onAction="#actionSeConnecter" style="-fx-background-color: #3498DB; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; -fx-background-radius: 5;" prefWidth="150.0" prefHeight="40.0">
+    <Button fx:id="boutonSeConnecterLoginView" text="Se Connecter" onAction="#actionAuthentificationUtilisateur" styleClass="bouton-connexion-login" prefWidth="200.0" prefHeight="45.0">
         <VBox.margin>
-            <Insets top="20.0" />
+            <Insets top="25.0" />
         </VBox.margin>
     </Button>
-
-    <!-- Optionnel: lien pour mot de passe oublié ou aide -->
-    <!-- <Hyperlink text="Mot de passe oublié ?" onAction="#actionMotDePasseOublie" /> -->
 </VBox>

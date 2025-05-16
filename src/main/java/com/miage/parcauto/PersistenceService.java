@@ -10,9 +10,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.math.BigDecimal; // Ajout pour FonctionsPersonnel et ServiceEntreprise
+
 
 public class PersistenceService {
     private static final Logger LOGGER_PERSISTANCE = Logger.getLogger(PersistenceService.class.getName());
+
     private Affectation mapResultSetToAffectation(ResultSet rs) throws SQLException {
         Affectation affectation = new Affectation();
         affectation.setId(rs.getInt("id"));
@@ -96,7 +99,7 @@ public class PersistenceService {
             pstmt.setObject(2, affectation.getIdPersonnel());
             pstmt.setObject(3, affectation.getIdSocietaire());
             pstmt.setString(4, affectation.getType().getDbValue());
-            pstmt.setTimestamp(5, Timestamp.valueOf(affectation.getDateDebut()));
+            pstmt.setTimestamp(5, affectation.getDateDebut() != null ? Timestamp.valueOf(affectation.getDateDebut()) : null);
             if (affectation.getDateFin() != null) {
                 pstmt.setTimestamp(6, Timestamp.valueOf(affectation.getDateFin()));
             } else {
@@ -134,7 +137,7 @@ public class PersistenceService {
             pstmt.setInt(1, idAffectation);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucune affectation supprimée pour l'ID: " + idAffectation + " (elle n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucune affectation supprimée pour l'ID: " + idAffectation + " (elle n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression de l'affectation par ID: " + idAffectation, e);
@@ -151,7 +154,6 @@ public class PersistenceService {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression des affectations pour le véhicule ID: " + idVehicule, e);
         }
     }
-
 
     private Assurance mapResultSetToAssurance(ResultSet rs) throws SQLException {
         Assurance assurance = new Assurance();
@@ -202,7 +204,8 @@ public class PersistenceService {
 
     public Assurance sauvegarderAssurance(Assurance assurance) {
         Objects.requireNonNull(assurance, "L'objet Assurance ne peut être nul.");
-        final boolean isInsert = assurance.getNumCarteAssurance() == 0;
+        // La BDD a num_carte_assurance en AUTO_INCREMENT, donc isInsert est basé sur la valeur 0
+        final boolean isInsert = (assurance.getNumCarteAssurance() == 0);
         final String sql = isInsert ?
                 "INSERT INTO ASSURANCE (date_debut_assurance, date_fin_assurance, agence, cout_assurance) VALUES (?, ?, ?, ?)" :
                 "UPDATE ASSURANCE SET date_debut_assurance = ?, date_fin_assurance = ?, agence = ?, cout_assurance = ? WHERE num_carte_assurance = ?";
@@ -264,7 +267,7 @@ public class PersistenceService {
                 pstmtAssurance.setInt(1, numCarteAssurance);
                 int affectedRows = pstmtAssurance.executeUpdate();
                 if (affectedRows == 0) {
-                    System.out.println("Aucune assurance supprimée pour le numéro: " + numCarteAssurance + " (elle n'existait peut-être pas).");
+                    LOGGER_PERSISTANCE.info("Aucune assurance supprimée pour le numéro: " + numCarteAssurance + " (elle n'existait peut-être pas).");
                 }
             }
             conn.commit();
@@ -283,7 +286,7 @@ public class PersistenceService {
                     conn.setAutoCommit(true);
                     conn.close();
                 } catch (SQLException ex) {
-                    // Ignorer ou logger
+                    LOGGER_PERSISTANCE.log(Level.WARNING, "Erreur à la fermeture de connexion post suppression assurance.", ex);
                 }
             }
         }
@@ -418,7 +421,6 @@ public class PersistenceService {
         return depenses;
     }
 
-
     public DepenseMission sauvegarderDepenseMission(DepenseMission depenseMission) {
         Objects.requireNonNull(depenseMission, "L'objet DepenseMission ne peut être nul.");
         final boolean isInsert = depenseMission.getId() == 0;
@@ -463,12 +465,25 @@ public class PersistenceService {
             pstmt.setInt(1, idDepense);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucune dépense de mission supprimée pour l'ID: " + idDepense + " (elle n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucune dépense de mission supprimée pour l'ID: " + idDepense + " (elle n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression de la dépense de mission par ID: " + idDepense, e);
         }
     }
+
+    public void supprimerToutesDepensesPourMission(int idMission) {
+        final String sql = "DELETE FROM DEPENSE_MISSION WHERE id_mission = ?";
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, idMission);
+            pstmt.executeUpdate();
+            LOGGER_PERSISTANCE.info("Toutes les dépenses pour la mission ID " + idMission + " ont été supprimées.");
+        } catch (SQLException e) {
+            throw new ErreurBaseDeDonnees("Erreur lors de la suppression de toutes les dépenses pour la mission ID: " + idMission, e);
+        }
+    }
+
 
     private DocumentSocietaire mapResultSetToDocumentSocietaire(ResultSet rs) throws SQLException {
         DocumentSocietaire doc = new DocumentSocietaire();
@@ -500,8 +515,12 @@ public class PersistenceService {
     }
 
     public List<DocumentSocietaire> trouverTousLesDocumentsSocietaire() {
+        return trouverTousLesDocumentsSocietaires(); // Appel de la méthode corrigée
+    }
+
+    public List<DocumentSocietaire> trouverTousLesDocumentsSocietaires() {
         List<DocumentSocietaire> documents = new ArrayList<>();
-        final String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE";
+        final String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE ORDER BY id_societaire, date_upload DESC";
         try (Connection conn = dbUtil.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -509,10 +528,12 @@ public class PersistenceService {
                 documents.add(mapResultSetToDocumentSocietaire(rs));
             }
         } catch (SQLException e) {
-            throw new ErreurBaseDeDonnees("Erreur lors de la récupération de tous les documents sociétaire.", e);
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la récupération de tous les documents sociétaires.", e);
+            throw new ErreurBaseDeDonnees("Impossible de récupérer tous les documents sociétaires.", e);
         }
         return documents;
     }
+
 
     public List<DocumentSocietaire> trouverDocumentsParSocietaireId(int idSocietaire) {
         List<DocumentSocietaire> documents = new ArrayList<>();
@@ -531,6 +552,41 @@ public class PersistenceService {
         return documents;
     }
 
+    public List<DocumentSocietaire> trouverDocumentsParType(TypeDocumentSocietaire typeDoc) {
+        List<DocumentSocietaire> documents = new ArrayList<>();
+        String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE WHERE type_doc = ? ORDER BY date_upload DESC";
+        try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, typeDoc.getDbValue());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    documents.add(mapResultSetToDocumentSocietaire(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche documents par type: " + typeDoc, e);
+            throw new ErreurBaseDeDonnees("Impossible de trouver documents par type.", e);
+        }
+        return documents;
+    }
+
+    public List<DocumentSocietaire> trouverDocumentsParSocietaireEtType(int idSocietaire, TypeDocumentSocietaire typeDoc) {
+        List<DocumentSocietaire> documents = new ArrayList<>();
+        String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE WHERE id_societaire = ? AND type_doc = ? ORDER BY date_upload DESC";
+        try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, idSocietaire);
+            pstmt.setString(2, typeDoc.getDbValue());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    documents.add(mapResultSetToDocumentSocietaire(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche documents pour sociétaire " + idSocietaire + " et type " + typeDoc, e);
+            throw new ErreurBaseDeDonnees("Impossible de trouver documents par sociétaire et type.", e);
+        }
+        return documents;
+    }
+
 
     public DocumentSocietaire sauvegarderDocumentSocietaire(DocumentSocietaire document) {
         Objects.requireNonNull(document, "L'objet DocumentSocietaire ne peut être nul.");
@@ -544,7 +600,7 @@ public class PersistenceService {
             pstmt.setInt(1, document.getIdSocietaire());
             pstmt.setString(2, document.getTypeDoc().getDbValue());
             pstmt.setString(3, document.getCheminFichier());
-            pstmt.setTimestamp(4, Timestamp.valueOf(document.getDateUpload()));
+            pstmt.setTimestamp(4, document.getDateUpload() != null ? Timestamp.valueOf(document.getDateUpload()) : null);
             if (!isInsert) {
                 pstmt.setInt(5, document.getIdDoc());
             }
@@ -576,7 +632,7 @@ public class PersistenceService {
             pstmt.setInt(1, idDoc);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun document sociétaire supprimé pour l'ID: " + idDoc + " (il n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucun document sociétaire supprimé pour l'ID: " + idDoc + " (il n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du document sociétaire par ID: " + idDoc, e);
@@ -660,15 +716,7 @@ public class PersistenceService {
 
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setInt(1, entretien.getIdVehicule());
-            pstmt.setTimestamp(2, entretien.getDateEntreeEntr() != null ? Timestamp.valueOf(entretien.getDateEntreeEntr()) : null);
-            pstmt.setTimestamp(3, entretien.getDateSortieEntr() != null ? Timestamp.valueOf(entretien.getDateSortieEntr()) : null);
-            pstmt.setString(4, entretien.getMotifEntr());
-            pstmt.setString(5, entretien.getObservation());
-            pstmt.setBigDecimal(6, entretien.getCoutEntr());
-            pstmt.setString(7, entretien.getLieuEntr());
-            pstmt.setString(8, entretien.getType() != null ? entretien.getType().getDbValue() : null);
-            pstmt.setString(9, entretien.getStatutOt() != null ? entretien.getStatutOt().getDbValue() : null);
+            definirParametresEntretienStatement(pstmt, entretien);
             if (!isInsert) {
                 pstmt.setInt(10, entretien.getIdEntretien());
             }
@@ -700,7 +748,7 @@ public class PersistenceService {
             pstmt.setInt(1, idEntretien);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun entretien supprimé pour l'ID: " + idEntretien + " (il n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucun entretien supprimé pour l'ID: " + idEntretien + " (il n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression de l'entretien par ID: " + idEntretien, e);
@@ -815,7 +863,7 @@ public class PersistenceService {
             pstmt.setInt(1, idEtatVoiture);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun état de voiture supprimé pour l'ID: " + idEtatVoiture + " (il n'existait peut-être pas ou est utilisé).");
+                LOGGER_PERSISTANCE.info("Aucun état de voiture supprimé pour l'ID: " + idEtatVoiture + " (il n'existait peut-être pas ou est utilisé).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression de l'état de voiture par ID: " + idEtatVoiture + ". Vérifiez s'il est utilisé par des véhicules.", e);
@@ -901,7 +949,7 @@ public class PersistenceService {
             pstmt.setInt(1, idFonction);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucune fonction personnel supprimée pour l'ID: " + idFonction + " (elle n'existait peut-être pas ou est utilisée).");
+                LOGGER_PERSISTANCE.info("Aucune fonction personnel supprimée pour l'ID: " + idFonction + " (elle n'existait peut-être pas ou est utilisée).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression de la fonction personnel par ID: " + idFonction + ". Vérifiez si elle est utilisée par du personnel.", e);
@@ -946,7 +994,7 @@ public class PersistenceService {
 
     public List<Mission> trouverMissionsActivesPourVehicule(int idVehicule) {
         List<Mission> missions = new ArrayList<>();
-        final String sql = "SELECT * FROM MISSION WHERE id_vehicule = ? AND status IN (?, ?)"; // PLANIFIEE, EN_COURS
+        final String sql = "SELECT * FROM MISSION WHERE id_vehicule = ? AND status IN (?, ?)";
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, idVehicule);
@@ -987,17 +1035,7 @@ public class PersistenceService {
 
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setInt(1, mission.getIdVehicule());
-            pstmt.setString(2, mission.getLibMission());
-            pstmt.setString(3, mission.getSite());
-            pstmt.setTimestamp(4, mission.getDateDebutMission() != null ? Timestamp.valueOf(mission.getDateDebutMission()) : null);
-            pstmt.setTimestamp(5, mission.getDateFinMission() != null ? Timestamp.valueOf(mission.getDateFinMission()) : null);
-            pstmt.setObject(6, mission.getKmPrevu(), Types.INTEGER);
-            pstmt.setObject(7, mission.getKmReel(), Types.INTEGER);
-            pstmt.setString(8, mission.getStatus() != null ? mission.getStatus().getDbValue() : null);
-            pstmt.setBigDecimal(9, mission.getCoutTotal());
-            pstmt.setString(10, mission.getCircuitMission());
-            pstmt.setString(11, mission.getObservationMission());
+            definirParametresMissionStatement(pstmt, mission);
             if (!isInsert) {
                 pstmt.setInt(12, mission.getIdMission());
             }
@@ -1039,7 +1077,7 @@ public class PersistenceService {
                 pstmtMission.setInt(1, idMission);
                 int affectedRows = pstmtMission.executeUpdate();
                 if (affectedRows == 0) {
-                    System.out.println("Aucune mission supprimée pour l'ID: " + idMission + " (elle n'existait peut-être pas).");
+                    LOGGER_PERSISTANCE.info("Aucune mission supprimée pour l'ID: " + idMission + " (elle n'existait peut-être pas).");
                 }
             }
             conn.commit();
@@ -1058,7 +1096,7 @@ public class PersistenceService {
                     conn.setAutoCommit(true);
                     conn.close();
                 } catch (SQLException ex) {
-                    // Ignorer ou logger
+                    LOGGER_PERSISTANCE.log(Level.WARNING, "Erreur à la fermeture de connexion post suppression mission.", ex);
                 }
             }
         }
@@ -1067,7 +1105,7 @@ public class PersistenceService {
     public void supprimerToutesMissionsPourVehicule(int idVehicule) {
         List<Mission> missions = trouverMissionsPourVehicule(idVehicule);
         for (Mission mission : missions) {
-            supprimerMissionParId(mission.getIdMission()); // Utilise la méthode qui gère les dépenses
+            supprimerMissionParId(mission.getIdMission());
         }
     }
 
@@ -1158,7 +1196,7 @@ public class PersistenceService {
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setInt(1, mouvement.getIdSocietaire());
-            pstmt.setTimestamp(2, Timestamp.valueOf(mouvement.getDate()));
+            pstmt.setTimestamp(2, mouvement.getDate() != null ? Timestamp.valueOf(mouvement.getDate()) : null);
             pstmt.setString(3, mouvement.getType().getDbValue());
             pstmt.setBigDecimal(4, mouvement.getMontant());
             if (!isInsert) {
@@ -1192,7 +1230,7 @@ public class PersistenceService {
             pstmt.setInt(1, idMouvement);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun mouvement supprimé pour l'ID: " + idMouvement + " (il n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucun mouvement supprimé pour l'ID: " + idMouvement + " (il n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du mouvement par ID: " + idMouvement, e);
@@ -1204,7 +1242,7 @@ public class PersistenceService {
         pers.setIdPersonnel(rs.getInt("id_personnel"));
         pers.setIdService(rs.getObject("id_service", Integer.class));
         pers.setIdFonction(rs.getObject("id_fonction", Integer.class));
-        pers.setIdVehicule(rs.getObject("id_vehicule", Integer.class)); // FK vers VEHICULES (véhicule de fonction)
+        pers.setIdVehicule(rs.getObject("id_vehicule", Integer.class));
         pers.setMatricule(rs.getString("matricule"));
         pers.setNomPersonnel(rs.getString("nom_personnel"));
         pers.setPrenomPersonnel(rs.getString("prenom_personnel"));
@@ -1297,18 +1335,14 @@ public class PersistenceService {
     }
 
     public void supprimerPersonnelParId(int idPersonnel) {
-        // Gérer les dépendances (UTILISATEUR.id_personnel, SOCIETAIRE_COMPTE.id_personnel, AFFECTATION.id_personnel)
-        // Option 1: Mettre à NULL dans les tables dépendantes (si la BDD le permet avec ON DELETE SET NULL)
-        // Option 2: Interdire la suppression si utilisé (plus sûr par défaut)
-        // Option 3: Supprimer en cascade (risqué si non voulu)
-        // Ici, nous allons opter pour une vérification simple. Une gestion plus fine serait dans BusinessLogicService.
-
         final String checkUtilisateurSql = "SELECT COUNT(*) FROM UTILISATEUR WHERE id_personnel = ?";
         final String checkSocietaireSql = "SELECT COUNT(*) FROM SOCIETAIRE_COMPTE WHERE id_personnel = ?";
         final String checkAffectationSql = "SELECT COUNT(*) FROM AFFECTATION WHERE id_personnel = ?";
         final String deletePersonnelSql = "DELETE FROM PERSONNEL WHERE id_personnel = ?";
 
-        try (Connection conn = dbUtil.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = dbUtil.getConnection();
             conn.setAutoCommit(false);
 
             try (PreparedStatement pstmtCheckUser = conn.prepareStatement(checkUtilisateurSql);
@@ -1322,6 +1356,8 @@ public class PersistenceService {
                     conn.rollback();
                     throw new ErreurLogiqueMetier("Impossible de supprimer le personnel ID " + idPersonnel + ": il est lié à un ou plusieurs utilisateurs.");
                 }
+                dbUtil.close(rsUser);
+
 
                 pstmtCheckSoc.setInt(1, idPersonnel);
                 ResultSet rsSoc = pstmtCheckSoc.executeQuery();
@@ -1329,6 +1365,7 @@ public class PersistenceService {
                     conn.rollback();
                     throw new ErreurLogiqueMetier("Impossible de supprimer le personnel ID " + idPersonnel + ": il est lié à un ou plusieurs comptes sociétaires.");
                 }
+                dbUtil.close(rsSoc);
 
                 pstmtCheckAff.setInt(1, idPersonnel);
                 ResultSet rsAff = pstmtCheckAff.executeQuery();
@@ -1336,22 +1373,30 @@ public class PersistenceService {
                     conn.rollback();
                     throw new ErreurLogiqueMetier("Impossible de supprimer le personnel ID " + idPersonnel + ": il est lié à une ou plusieurs affectations.");
                 }
+                dbUtil.close(rsAff);
 
                 pstmtDelete.setInt(1, idPersonnel);
                 int affectedRows = pstmtDelete.executeUpdate();
                 if (affectedRows == 0) {
-                    System.out.println("Aucun personnel supprimé pour l'ID: " + idPersonnel + " (il n'existait peut-être pas).");
+                    LOGGER_PERSISTANCE.info("Aucun personnel supprimé pour l'ID: " + idPersonnel + " (il n'existait peut-être pas).");
                 }
                 conn.commit();
             } catch (SQLException eInner) {
-                conn.rollback();
+                if (conn != null) conn.rollback();
                 throw eInner;
-            } finally {
-                conn.setAutoCommit(true);
             }
 
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du personnel par ID: " + idPersonnel, e);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (SQLException ex) {
+                    LOGGER_PERSISTANCE.log(Level.WARNING, "Erreur à la fermeture de connexion post suppression personnel.", ex);
+                }
+            }
         }
     }
 
@@ -1436,7 +1481,7 @@ public class PersistenceService {
             pstmt.setInt(1, idService);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun service entreprise supprimé pour l'ID: " + idService + " (il n'existait peut-être pas ou est utilisé).");
+                LOGGER_PERSISTANCE.info("Aucun service entreprise supprimé pour l'ID: " + idService + " (il n'existait peut-être pas ou est utilisé).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du service entreprise par ID: " + idService + ". Vérifiez s'il est utilisé par du personnel.", e);
@@ -1471,6 +1516,24 @@ public class PersistenceService {
         return null;
     }
 
+    public SocietaireCompte trouverSocietaireCompteParNumero(String numeroCompte) {
+        Objects.requireNonNull(numeroCompte, "Le numéro de compte ne peut être nul.");
+        final String sql = "SELECT * FROM SOCIETAIRE_COMPTE WHERE numero = ?";
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, numeroCompte);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapResultSetToSocietaireCompte(rs);
+                }
+            }
+        } catch (SQLException e) {
+            throw new ErreurBaseDeDonnees("Erreur lors de la recherche du compte sociétaire par numéro: " + numeroCompte, e);
+        }
+        return null;
+    }
+
+
     public List<SocietaireCompte> trouverTousLesSocietairesComptes() {
         List<SocietaireCompte> comptes = new ArrayList<>();
         final String sql = "SELECT * FROM SOCIETAIRE_COMPTE";
@@ -1495,12 +1558,7 @@ public class PersistenceService {
 
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setObject(1, compte.getIdPersonnel(), Types.INTEGER);
-            pstmt.setString(2, compte.getNom());
-            pstmt.setString(3, compte.getNumero());
-            pstmt.setBigDecimal(4, compte.getSolde());
-            pstmt.setString(5, compte.getEmail());
-            pstmt.setString(6, compte.getTelephone());
+            definirParametresSocietaireCompteStatement(pstmt, compte);
             if (!isInsert) {
                 pstmt.setInt(7, compte.getIdSocietaire());
             }
@@ -1526,16 +1584,13 @@ public class PersistenceService {
     }
 
     public void supprimerSocietaireCompteParId(int idSocietaire) {
-        // Gérer dépendances: MOUVEMENT, DOCUMENT_SOCIETAIRE, AFFECTATION
-        // Pour simplifier ici, on suppose que ON DELETE CASCADE est configuré en BDD pour ces tables
-        // ou que la logique métier s'assure de la non-utilisation avant suppression.
         final String sql = "DELETE FROM SOCIETAIRE_COMPTE WHERE id_societaire = ?";
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, idSocietaire);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun compte sociétaire supprimé pour l'ID: " + idSocietaire + " (il n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucun compte sociétaire supprimé pour l'ID: " + idSocietaire + " (il n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du compte sociétaire par ID: " + idSocietaire + ". Vérifiez les dépendances (mouvements, documents, affectations).", e);
@@ -1546,7 +1601,7 @@ public class PersistenceService {
         Utilisateur utilisateur = new Utilisateur();
         utilisateur.setId(rs.getInt("id"));
         utilisateur.setLogin(rs.getString("login"));
-        utilisateur.setHashMdp(rs.getString("hash")); // La colonne est 'hash' dans la BDD
+        utilisateur.setHashMdp(rs.getString("hash"));
         utilisateur.setRole(RoleUtilisateur.fromDbValue(rs.getString("role")));
         utilisateur.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
         utilisateur.setMfaSecret(rs.getString("mfa_secret"));
@@ -1601,6 +1656,25 @@ public class PersistenceService {
         return utilisateurs;
     }
 
+    public List<Utilisateur> trouverUtilisateursParRole(RoleUtilisateur role) {
+        Objects.requireNonNull(role, "Le rôle ne peut être nul.");
+        List<Utilisateur> utilisateurs = new ArrayList<>();
+        final String sql = "SELECT * FROM UTILISATEUR WHERE role = ?";
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, role.getDbValue());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    utilisateurs.add(mapResultSetToUtilisateur(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new ErreurBaseDeDonnees("Erreur lors de la recherche des utilisateurs par rôle: " + role, e);
+        }
+        return utilisateurs;
+    }
+
+
     public Utilisateur sauvegarderUtilisateur(Utilisateur utilisateur) {
         Objects.requireNonNull(utilisateur, "L'objet Utilisateur ne peut être nul.");
         final boolean isInsert = utilisateur.getId() == 0;
@@ -1610,11 +1684,7 @@ public class PersistenceService {
 
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setString(1, utilisateur.getLogin());
-            pstmt.setString(2, utilisateur.getHashMdp());
-            pstmt.setString(3, utilisateur.getRole().getDbValue());
-            pstmt.setObject(4, utilisateur.getIdPersonnel(), Types.INTEGER);
-            pstmt.setString(5, utilisateur.getMfaSecret());
+            definirParametresUtilisateurStatement(pstmt, utilisateur);
             if (!isInsert) {
                 pstmt.setInt(6, utilisateur.getId());
             }
@@ -1646,7 +1716,7 @@ public class PersistenceService {
             pstmt.setInt(1, idUtilisateur);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun utilisateur supprimé pour l'ID: " + idUtilisateur + " (il n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucun utilisateur supprimé pour l'ID: " + idUtilisateur + " (il n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression de l'utilisateur par ID: " + idUtilisateur, e);
@@ -1752,22 +1822,7 @@ public class PersistenceService {
 
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            pstmt.setInt(1, vehicule.getIdEtatVoiture());
-            pstmt.setString(2, vehicule.getEnergie().getDbValue());
-            pstmt.setString(3, vehicule.getNumeroChassi());
-            pstmt.setString(4, vehicule.getImmatriculation());
-            pstmt.setString(5, vehicule.getMarque());
-            pstmt.setString(6, vehicule.getModele());
-            pstmt.setObject(7, vehicule.getNbPlaces(), Types.INTEGER);
-            pstmt.setTimestamp(8, vehicule.getDateAcquisition() != null ? Timestamp.valueOf(vehicule.getDateAcquisition()) : null);
-            pstmt.setTimestamp(9, vehicule.getDateAmmortissement() != null ? Timestamp.valueOf(vehicule.getDateAmmortissement()) : null);
-            pstmt.setTimestamp(10, vehicule.getDateMiseEnService() != null ? Timestamp.valueOf(vehicule.getDateMiseEnService()) : null);
-            pstmt.setObject(11, vehicule.getPuissance(), Types.INTEGER);
-            pstmt.setString(12, vehicule.getCouleur());
-            pstmt.setBigDecimal(13, vehicule.getPrixVehicule());
-            pstmt.setObject(14, vehicule.getKmActuels(), Types.INTEGER);
-            pstmt.setTimestamp(15, vehicule.getDateEtat() != null ? Timestamp.valueOf(vehicule.getDateEtat()) : null);
-
+            definirParametresVehiculeStatement(pstmt, vehicule);
             if (!isInsert) {
                 pstmt.setInt(16, vehicule.getIdVehicule());
             }
@@ -1793,366 +1848,296 @@ public class PersistenceService {
     }
 
     public void supprimerVehiculeParId(int idVehicule) {
-        // La suppression des dépendances (Missions, Entretiens, Affectations, Couvrir)
-        // est gérée dans BusinessLogicService avant d'appeler cette méthode,
-        // ou devrait être gérée par des contraintes ON DELETE CASCADE dans la BDD.
-        // Ici, on supprime juste le véhicule.
         final String sql = "DELETE FROM VEHICULES WHERE id_vehicule = ?";
         try (Connection conn = dbUtil.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, idVehicule);
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows == 0) {
-                System.out.println("Aucun véhicule supprimé pour l'ID: " + idVehicule + " (il n'existait peut-être pas).");
+                LOGGER_PERSISTANCE.info("Aucun véhicule supprimé pour l'ID: " + idVehicule + " (il n'existait peut-être pas).");
             }
         } catch (SQLException e) {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du véhicule par ID: " + idVehicule + ". Vérifiez les dépendances non gérées.", e);
         }
     }
-        public List<Vehicule> trouverVehiculesParEtat(int idEtatVoiture) {
-            List<Vehicule> vehicules = new ArrayList<>();
-            String sql = "SELECT * FROM VEHICULES WHERE id_etat_voiture = ? ORDER BY marque, modele";
-            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, idEtatVoiture);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        vehicules.add(extraireVehiculeDepuisResultSet(rs));
-                    }
-                }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la récupération des véhicules par état.", e);
-                throw new ErreurBaseDeDonnees("Impossible de récupérer les véhicules par état.", e);
-            }
-            return vehicules;
-        }
-
-        public SocietaireCompte trouverSocietaireCompteParIdPersonnel(int idPersonnel) {
-            String sql = "SELECT * FROM SOCIETAIRE_COMPTE WHERE id_personnel = ?";
-            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, idPersonnel);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) return extraireSocietaireCompteDepuisResultSet(rs);
-                }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche sociétaire par ID Personnel: " + idPersonnel, e);
-                throw new ErreurBaseDeDonnees("Impossible de trouver sociétaire par ID Personnel.", e);
-            }
-            return null; // Peut y avoir plusieurs comptes pour un personnel? Schema dit non.
-        }
-
-        public List<DocumentSocietaire> trouverDocumentsParType(TypeDocumentSocietaire typeDoc) {
-            List<DocumentSocietaire> documents = new ArrayList<>();
-            String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE WHERE type_doc = ? ORDER BY date_upload DESC";
-            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, typeDoc.getDbValue());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        documents.add(extraireDocumentSocietaireDepuisResultSet(rs));
-                    }
-                }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche documents par type: " + typeDoc, e);
-                throw new ErreurBaseDeDonnees("Impossible de trouver documents par type.", e);
-            }
-            return documents;
-        }
-
-        public List<DocumentSocietaire> trouverDocumentsParSocietaireEtType(int idSocietaire, TypeDocumentSocietaire typeDoc) {
-            List<DocumentSocietaire> documents = new ArrayList<>();
-            String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE WHERE id_societaire = ? AND type_doc = ? ORDER BY date_upload DESC";
-            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, idSocietaire);
-                pstmt.setString(2, typeDoc.getDbValue());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        documents.add(extraireDocumentSocietaireDepuisResultSet(rs));
-                    }
-                }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche documents pour sociétaire " + idSocietaire + " et type " + typeDoc, e);
-                throw new ErreurBaseDeDonnees("Impossible de trouver documents par sociétaire et type.", e);
-            }
-            return documents;
-        }
-
-        public List<DocumentSocietaire> trouverTousLesDocumentsSocietaires() {
-            List<DocumentSocietaire> documents = new ArrayList<>();
-            String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE ORDER BY id_societaire, date_upload DESC";
-            try (Connection conn = dbUtil.getConnection();
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+    public List<Vehicule> trouverVehiculesParEtat(int idEtatVoiture) {
+        List<Vehicule> vehicules = new ArrayList<>();
+        String sql = "SELECT * FROM VEHICULES WHERE id_etat_voiture = ? ORDER BY marque, modele";
+        try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, idEtatVoiture);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    documents.add(extraireDocumentSocietaireDepuisResultSet(rs));
+                    vehicules.add(mapResultSetToVehicule(rs));
                 }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la récupération de tous les documents sociétaires.", e);
-                throw new ErreurBaseDeDonnees("Impossible de récupérer tous les documents sociétaires.", e);
             }
-            return documents;
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la récupération des véhicules par état.", e);
+            throw new ErreurBaseDeDonnees("Impossible de récupérer les véhicules par état.", e);
         }
+        return vehicules;
+    }
 
-        public int compterTousLesVehicules() {
-            String sql = "SELECT COUNT(*) FROM VEHICULES";
-            try (Connection conn = dbUtil.getConnection();
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(sql)) {
+    public SocietaireCompte trouverSocietaireCompteParIdPersonnel(int idPersonnel) {
+        String sql = "SELECT * FROM SOCIETAIRE_COMPTE WHERE id_personnel = ?";
+        try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, idPersonnel);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return mapResultSetToSocietaireCompte(rs);
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche sociétaire par ID Personnel: " + idPersonnel, e);
+            throw new ErreurBaseDeDonnees("Impossible de trouver sociétaire par ID Personnel.", e);
+        }
+        return null;
+    }
+
+    public int compterTousLesVehicules() {
+        String sql = "SELECT COUNT(*) FROM VEHICULES";
+        try (Connection conn = dbUtil.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des véhicules.", e);
+            throw new ErreurBaseDeDonnees("Impossible de compter les véhicules.", e);
+        }
+        return 0;
+    }
+
+    public int compterMissionsParStatut(StatutMission statut) {
+        String sql = "SELECT COUNT(*) FROM MISSION WHERE status = ?";
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, statut.getDbValue());
+            try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt(1);
                 }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des véhicules.", e);
-                throw new ErreurBaseDeDonnees("Impossible de compter les véhicules.", e);
             }
-            return 0;
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des missions par statut: " + statut, e);
+            throw new ErreurBaseDeDonnees("Impossible de compter les missions par statut.", e);
         }
-
-        public int compterMissionsParStatut(StatutMission statut) {
-            String sql = "SELECT COUNT(*) FROM MISSION WHERE status = ?";
-            try (Connection conn = dbUtil.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, statut.getDbValue());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt(1);
-                    }
-                }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des missions par statut: " + statut, e);
-                throw new ErreurBaseDeDonnees("Impossible de compter les missions par statut.", e);
-            }
-            return 0;
-        }
-
-        public int compterEntretiensParStatutOT(StatutOrdreTravail statutOT) {
-            String sql = "SELECT COUNT(*) FROM ENTRETIEN WHERE statut_ot = ?";
-            try (Connection conn = dbUtil.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, statutOT.getDbValue());
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt(1);
-                    }
-                }
-            } catch (SQLException e) {
-                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des entretiens par statut OT: " + statutOT, e);
-                throw new ErreurBaseDeDonnees("Impossible de compter les entretiens par statut OT.", e);
-            }
-            return 0;
-        }
-
-        // Méthodes d'extraction depuis ResultSet
-        private Vehicule extraireVehiculeDepuisResultSet(ResultSet rs) throws SQLException {
-            Vehicule v = new Vehicule();
-            v.setIdVehicule(rs.getInt("id_vehicule"));
-            v.setIdEtatVoiture(rs.getInt("id_etat_voiture"));
-            v.setEnergie(EnergieVehicule.fromDbValue(rs.getString("energie")));
-            v.setNumeroChassi(rs.getString("numero_chassi"));
-            v.setImmatriculation(rs.getString("immatriculation"));
-            v.setMarque(rs.getString("marque"));
-            v.setModele(rs.getString("modele"));
-            v.setNbPlaces(rs.getObject("nb_places", Integer.class));
-            Timestamp tsAcquisition = rs.getTimestamp("date_acquisition");
-            if (tsAcquisition != null) v.setDateAcquisition(tsAcquisition.toLocalDateTime());
-            Timestamp tsAmmortissement = rs.getTimestamp("date_ammortissement");
-            if (tsAmmortissement != null) v.setDateAmmortissement(tsAmmortissement.toLocalDateTime());
-            Timestamp tsMiseService = rs.getTimestamp("date_mise_en_service");
-            if (tsMiseService != null) v.setDateMiseEnService(tsMiseService.toLocalDateTime());
-            v.setPuissance(rs.getObject("puissance", Integer.class));
-            v.setCouleur(rs.getString("couleur"));
-            v.setPrixVehicule(rs.getBigDecimal("prix_vehicule"));
-            v.setKmActuels(rs.getObject("km_actuels", Integer.class));
-            Timestamp tsEtat = rs.getTimestamp("date_etat");
-            if (tsEtat != null) v.setDateEtat(tsEtat.toLocalDateTime());
-            return v;
-        }
-
-        private Mission extraireMissionDepuisResultSet(ResultSet rs) throws SQLException {
-            Mission m = new Mission();
-            m.setIdMission(rs.getInt("id_mission"));
-            m.setIdVehicule(rs.getInt("id_vehicule"));
-            m.setLibMission(rs.getString("lib_mission"));
-            m.setSite(rs.getString("site"));
-            Timestamp tsDebut = rs.getTimestamp("date_debut_mission");
-            if (tsDebut != null) m.setDateDebutMission(tsDebut.toLocalDateTime());
-            Timestamp tsFin = rs.getTimestamp("date_fin_mission");
-            if (tsFin != null) m.setDateFinMission(tsFin.toLocalDateTime());
-            m.setKmPrevu(rs.getObject("km_prevu", Integer.class));
-            m.setKmReel(rs.getObject("km_reel", Integer.class));
-            m.setStatus(StatutMission.fromDbValue(rs.getString("status")));
-            m.setCoutTotal(rs.getBigDecimal("cout_total"));
-            m.setCircuitMission(rs.getString("circuit_mission"));
-            m.setObservationMission(rs.getString("observation_mission"));
-            return m;
-        }
-
-        private Affectation extraireAffectationDepuisResultSet(ResultSet rs) throws SQLException {
-            Affectation a = new Affectation();
-            a.setId(rs.getInt("id"));
-            a.setIdVehicule(rs.getInt("id_vehicule"));
-            a.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
-            a.setIdSocietaire(rs.getObject("id_societaire", Integer.class));
-            a.setType(TypeAffectation.fromDbValue(rs.getString("type")));
-            a.setDateDebut(rs.getTimestamp("date_debut").toLocalDateTime());
-            Timestamp dateFinTs = rs.getTimestamp("date_fin");
-            if (dateFinTs != null) {
-                a.setDateFin(dateFinTs.toLocalDateTime());
-            }
-            return a;
-        }
-
-        private DepenseMission extraireDepenseMissionDepuisResultSet(ResultSet rs) throws SQLException {
-            DepenseMission d = new DepenseMission();
-            d.setId(rs.getInt("id"));
-            d.setIdMission(rs.getInt("id_mission"));
-            d.setNature(NatureDepense.fromDbValue(rs.getString("nature")));
-            d.setMontant(rs.getBigDecimal("montant"));
-            d.setJustificatif(rs.getString("justificatif"));
-            return d;
-        }
-
-        private Entretien extraireEntretienDepuisResultSet(ResultSet rs) throws SQLException {
-            Entretien e = new Entretien();
-            e.setIdEntretien(rs.getInt("id_entretien"));
-            e.setIdVehicule(rs.getInt("id_vehicule"));
-            Timestamp tsEntree = rs.getTimestamp("date_entree_entr");
-            if (tsEntree != null) e.setDateEntreeEntr(tsEntree.toLocalDateTime());
-            Timestamp tsSortie = rs.getTimestamp("date_sortie_entr");
-            if (tsSortie != null) e.setDateSortieEntr(tsSortie.toLocalDateTime());
-            e.setMotifEntr(rs.getString("motif_entr"));
-            e.setObservation(rs.getString("observation"));
-            e.setCoutEntr(rs.getBigDecimal("cout_entr"));
-            e.setLieuEntr(rs.getString("lieu_entr"));
-            String typeStr = rs.getString("type");
-            if (typeStr != null) e.setType(TypeEntretien.fromDbValue(typeStr));
-            String statutOtStr = rs.getString("statut_ot");
-            if (statutOtStr != null) e.setStatutOt(StatutOrdreTravail.fromDbValue(statutOtStr));
-            return e;
-        }
-
-        private SocietaireCompte extraireSocietaireCompteDepuisResultSet(ResultSet rs) throws SQLException {
-            SocietaireCompte sc = new SocietaireCompte();
-            sc.setIdSocietaire(rs.getInt("id_societaire"));
-            sc.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
-            sc.setNom(rs.getString("nom"));
-            sc.setNumero(rs.getString("numero"));
-            sc.setSolde(rs.getBigDecimal("solde"));
-            sc.setEmail(rs.getString("email"));
-            sc.setTelephone(rs.getString("telephone"));
-            return sc;
-        }
-
-        private Mouvement extraireMouvementDepuisResultSet(ResultSet rs) throws SQLException {
-            Mouvement m = new Mouvement();
-            m.setId(rs.getInt("id"));
-            m.setIdSocietaire(rs.getInt("id_societaire"));
-            m.setDate(rs.getTimestamp("date").toLocalDateTime());
-            m.setType(TypeMouvement.fromDbValue(rs.getString("type")));
-            m.setMontant(rs.getBigDecimal("montant"));
-            return m;
-        }
-
-        private DocumentSocietaire extraireDocumentSocietaireDepuisResultSet(ResultSet rs) throws SQLException {
-            DocumentSocietaire d = new DocumentSocietaire();
-            d.setIdDoc(rs.getInt("id_doc"));
-            d.setIdSocietaire(rs.getInt("id_societaire"));
-            d.setTypeDoc(TypeDocumentSocietaire.fromDbValue(rs.getString("type_doc")));
-            d.setCheminFichier(rs.getString("chemin_fichier"));
-            d.setDateUpload(rs.getTimestamp("date_upload").toLocalDateTime());
-            return d;
-        }
-
-        private Utilisateur extraireUtilisateurDepuisResultSet(ResultSet rs) throws SQLException {
-            Utilisateur u = new Utilisateur();
-            u.setId(rs.getInt("id"));
-            u.setLogin(rs.getString("login"));
-            u.setHashMdp(rs.getString("hash"));
-            u.setRole(RoleUtilisateur.fromDbValue(rs.getString("role")));
-            u.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
-            u.setMfaSecret(rs.getString("mfa_secret"));
-            return u;
-        }
-
-        private Personnel extrairePersonnelDepuisResultSet(ResultSet rs) throws SQLException {
-            Personnel p = new Personnel();
-            p.setIdPersonnel(rs.getInt("id_personnel"));
-            p.setIdService(rs.getObject("id_service", Integer.class));
-            p.setIdFonction(rs.getObject("id_fonction", Integer.class));
-            p.setIdVehicule(rs.getObject("id_vehicule", Integer.class)); // Peut être null
-            p.setMatricule(rs.getString("matricule"));
-            p.setNomPersonnel(rs.getString("nom_personnel"));
-            p.setPrenomPersonnel(rs.getString("prenom_personnel"));
-            p.setEmail(rs.getString("email"));
-            p.setTelephone(rs.getString("telephone"));
-            p.setAdresse(rs.getString("adresse"));
-            Date dateNaissanceSql = rs.getDate("date_naissance");
-            if (dateNaissanceSql != null) p.setDateNaissance(dateNaissanceSql.toLocalDate());
-            String sexeStr = rs.getString("sexe");
-            if (sexeStr != null) p.setSexe(SexePersonnel.fromDbValue(sexeStr));
-            Timestamp dateAttributionTs = rs.getTimestamp("date_attribution");
-            if (dateAttributionTs != null) p.setDateAttribution(dateAttributionTs.toLocalDateTime());
-            return p;
-        }
-
-
-        // Méthodes pour définir les paramètres des PreparedStatement
-        private void definirParametresVehiculeStatement(PreparedStatement pstmt, Vehicule v) throws SQLException {
-            pstmt.setInt(1, v.getIdEtatVoiture());
-            pstmt.setString(2, v.getEnergie().getDbValue());
-            pstmt.setString(3, v.getNumeroChassi());
-            pstmt.setString(4, v.getImmatriculation());
-            pstmt.setString(5, v.getMarque());
-            pstmt.setString(6, v.getModele());
-            pstmt.setObject(7, v.getNbPlaces());
-            pstmt.setTimestamp(8, v.getDateAcquisition() != null ? Timestamp.valueOf(v.getDateAcquisition()) : null);
-            pstmt.setTimestamp(9, v.getDateAmmortissement() != null ? Timestamp.valueOf(v.getDateAmmortissement()) : null);
-            pstmt.setTimestamp(10, v.getDateMiseEnService() != null ? Timestamp.valueOf(v.getDateMiseEnService()) : null);
-            pstmt.setObject(11, v.getPuissance());
-            pstmt.setString(12, v.getCouleur());
-            pstmt.setBigDecimal(13, v.getPrixVehicule());
-            pstmt.setObject(14, v.getKmActuels());
-            pstmt.setTimestamp(15, v.getDateEtat() != null ? Timestamp.valueOf(v.getDateEtat()) : Timestamp.valueOf(LocalDateTime.now()));
-        }
-
-        private void definirParametresMissionStatement(PreparedStatement pstmt, Mission m) throws SQLException {
-            pstmt.setInt(1, m.getIdVehicule());
-            pstmt.setString(2, m.getLibMission());
-            pstmt.setString(3, m.getSite());
-            pstmt.setTimestamp(4, m.getDateDebutMission() != null ? Timestamp.valueOf(m.getDateDebutMission()) : null);
-            pstmt.setTimestamp(5, m.getDateFinMission() != null ? Timestamp.valueOf(m.getDateFinMission()) : null);
-            pstmt.setObject(6, m.getKmPrevu());
-            pstmt.setObject(7, m.getKmReel());
-            pstmt.setString(8, m.getStatus().getDbValue());
-            pstmt.setBigDecimal(9, m.getCoutTotal());
-            pstmt.setString(10, m.getCircuitMission());
-            pstmt.setString(11, m.getObservationMission());
-        }
-
-        private void definirParametresEntretienStatement(PreparedStatement pstmt, Entretien e) throws SQLException {
-            pstmt.setInt(1, e.getIdVehicule());
-            pstmt.setTimestamp(2, e.getDateEntreeEntr() != null ? Timestamp.valueOf(e.getDateEntreeEntr()) : null);
-            pstmt.setTimestamp(3, e.getDateSortieEntr() != null ? Timestamp.valueOf(e.getDateSortieEntr()) : null);
-            pstmt.setString(4, e.getMotifEntr());
-            pstmt.setString(5, e.getObservation());
-            pstmt.setBigDecimal(6, e.getCoutEntr());
-            pstmt.setString(7, e.getLieuEntr());
-            pstmt.setString(8, e.getType() != null ? e.getType().getDbValue() : null);
-            pstmt.setString(9, e.getStatutOt() != null ? e.getStatutOt().getDbValue() : StatutOrdreTravail.OUVERT.getDbValue());
-        }
-
-        private void definirParametresSocietaireCompteStatement(PreparedStatement pstmt, SocietaireCompte sc) throws SQLException {
-            pstmt.setObject(1, sc.getIdPersonnel());
-            pstmt.setString(2, sc.getNom());
-            pstmt.setString(3, sc.getNumero());
-            pstmt.setBigDecimal(4, sc.getSolde());
-            pstmt.setString(5, sc.getEmail());
-            pstmt.setString(6, sc.getTelephone());
-        }
-
-        private void definirParametresUtilisateurStatement(PreparedStatement pstmt, Utilisateur u) throws SQLException {
-            pstmt.setString(1, u.getLogin());
-            pstmt.setString(2, u.getHashMdp());
-            pstmt.setString(3, u.getRole().getDbValue());
-            pstmt.setObject(4, u.getIdPersonnel());
-            pstmt.setString(5, u.getMfaSecret());
-        }
+        return 0;
     }
+
+    public int compterEntretiensParStatutOT(StatutOrdreTravail statutOT) {
+        String sql = "SELECT COUNT(*) FROM ENTRETIEN WHERE statut_ot = ?";
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, statutOT.getDbValue());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des entretiens par statut OT: " + statutOT, e);
+            throw new ErreurBaseDeDonnees("Impossible de compter les entretiens par statut OT.", e);
+        }
+        return 0;
+    }
+
+    private void definirParametresVehiculeStatement(PreparedStatement pstmt, Vehicule v) throws SQLException {
+        pstmt.setInt(1, v.getIdEtatVoiture());
+        pstmt.setString(2, v.getEnergie().getDbValue());
+        pstmt.setString(3, v.getNumeroChassi());
+        pstmt.setString(4, v.getImmatriculation());
+        pstmt.setString(5, v.getMarque());
+        pstmt.setString(6, v.getModele());
+        pstmt.setObject(7, v.getNbPlaces());
+        pstmt.setTimestamp(8, v.getDateAcquisition() != null ? Timestamp.valueOf(v.getDateAcquisition()) : null);
+        pstmt.setTimestamp(9, v.getDateAmmortissement() != null ? Timestamp.valueOf(v.getDateAmmortissement()) : null);
+        pstmt.setTimestamp(10, v.getDateMiseEnService() != null ? Timestamp.valueOf(v.getDateMiseEnService()) : null);
+        pstmt.setObject(11, v.getPuissance());
+        pstmt.setString(12, v.getCouleur());
+        pstmt.setBigDecimal(13, v.getPrixVehicule());
+        pstmt.setObject(14, v.getKmActuels());
+        pstmt.setTimestamp(15, v.getDateEtat() != null ? Timestamp.valueOf(v.getDateEtat()) : Timestamp.valueOf(LocalDateTime.now()));
+    }
+
+    private void definirParametresMissionStatement(PreparedStatement pstmt, Mission m) throws SQLException {
+        pstmt.setInt(1, m.getIdVehicule());
+        pstmt.setString(2, m.getLibMission());
+        pstmt.setString(3, m.getSite());
+        pstmt.setTimestamp(4, m.getDateDebutMission() != null ? Timestamp.valueOf(m.getDateDebutMission()) : null);
+        pstmt.setTimestamp(5, m.getDateFinMission() != null ? Timestamp.valueOf(m.getDateFinMission()) : null);
+        pstmt.setObject(6, m.getKmPrevu());
+        pstmt.setObject(7, m.getKmReel());
+        pstmt.setString(8, m.getStatus().getDbValue());
+        pstmt.setBigDecimal(9, m.getCoutTotal());
+        pstmt.setString(10, m.getCircuitMission());
+        pstmt.setString(11, m.getObservationMission());
+    }
+
+    private void definirParametresEntretienStatement(PreparedStatement pstmt, Entretien e) throws SQLException {
+        pstmt.setInt(1, e.getIdVehicule());
+        pstmt.setTimestamp(2, e.getDateEntreeEntr() != null ? Timestamp.valueOf(e.getDateEntreeEntr()) : null);
+        pstmt.setTimestamp(3, e.getDateSortieEntr() != null ? Timestamp.valueOf(e.getDateSortieEntr()) : null);
+        pstmt.setString(4, e.getMotifEntr());
+        pstmt.setString(5, e.getObservation());
+        pstmt.setBigDecimal(6, e.getCoutEntr());
+        pstmt.setString(7, e.getLieuEntr());
+        pstmt.setString(8, e.getType() != null ? e.getType().getDbValue() : null);
+        pstmt.setString(9, e.getStatutOt() != null ? e.getStatutOt().getDbValue() : StatutOrdreTravail.OUVERT.getDbValue());
+    }
+
+    private void definirParametresSocietaireCompteStatement(PreparedStatement pstmt, SocietaireCompte sc) throws SQLException {
+        pstmt.setObject(1, sc.getIdPersonnel());
+        pstmt.setString(2, sc.getNom());
+        pstmt.setString(3, sc.getNumero());
+        pstmt.setBigDecimal(4, sc.getSolde());
+        pstmt.setString(5, sc.getEmail());
+        pstmt.setString(6, sc.getTelephone());
+    }
+
+    private void definirParametresUtilisateurStatement(PreparedStatement pstmt, Utilisateur u) throws SQLException {
+        pstmt.setString(1, u.getLogin());
+        pstmt.setString(2, u.getHashMdp());
+        pstmt.setString(3, u.getRole().getDbValue());
+        pstmt.setObject(4, u.getIdPersonnel());
+        pstmt.setString(5, u.getMfaSecret());
+    }
+
+    public List<Vehicule> rechercherVehiculesFiltres(String immatriculation, String etatLibelle, EnergieVehicule energie) {
+        List<Vehicule> vehicules = new ArrayList<>();
+        StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM VEHICULES WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        if (immatriculation != null && !immatriculation.trim().isEmpty()) {
+            sqlBuilder.append(" AND immatriculation LIKE ?");
+            params.add("%" + immatriculation + "%");
+        }
+        if (etatLibelle != null && !etatLibelle.trim().isEmpty() && !"Tous les états".equalsIgnoreCase(etatLibelle)) {
+            sqlBuilder.append(" AND id_etat_voiture = (SELECT id_etat_voiture FROM ETAT_VOITURE WHERE lib_etat_voiture = ?)");
+            params.add(etatLibelle);
+        }
+        if (energie != null) {
+            sqlBuilder.append(" AND energie = ?");
+            params.add(energie.getDbValue());
+        }
+        sqlBuilder.append(" ORDER BY marque, modele");
+
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sqlBuilder.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    vehicules.add(mapResultSetToVehicule(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la recherche filtrée de véhicules.", e);
+            throw new ErreurBaseDeDonnees("Impossible de rechercher les véhicules avec les filtres spécifiés.", e);
+        }
+        return vehicules;
+    }
+
+    public List<Mission> rechercherMissionsFiltrees(LocalDateTime dateDebut, LocalDateTime dateFin, StatutMission statut, String rechercheVehiculeImmat) {
+        List<Mission> missions = new ArrayList<>();
+        StringBuilder sqlBuilder = new StringBuilder("SELECT m.* FROM MISSION m LEFT JOIN VEHICULES v ON m.id_vehicule = v.id_vehicule WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        if (dateDebut != null) {
+            sqlBuilder.append(" AND m.date_debut_mission >= ?");
+            params.add(Timestamp.valueOf(dateDebut));
+        }
+        if (dateFin != null) {
+            sqlBuilder.append(" AND m.date_debut_mission <= ?"); // Ou date_fin_mission <= ? selon la logique
+            params.add(Timestamp.valueOf(dateFin));
+        }
+        if (statut != null) {
+            sqlBuilder.append(" AND m.status = ?");
+            params.add(statut.getDbValue());
+        }
+        if (rechercheVehiculeImmat != null && !rechercheVehiculeImmat.trim().isEmpty()) {
+            sqlBuilder.append(" AND v.immatriculation LIKE ?");
+            params.add("%" + rechercheVehiculeImmat + "%");
+        }
+        sqlBuilder.append(" ORDER BY m.date_debut_mission DESC");
+
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sqlBuilder.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    missions.add(mapResultSetToMission(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la recherche filtrée de missions.", e);
+            throw new ErreurBaseDeDonnees("Impossible de rechercher les missions avec les filtres spécifiés.", e);
+        }
+        return missions;
+    }
+
+    public List<Entretien> rechercherEntretiensFiltres(LocalDateTime dateDebut, LocalDateTime dateFin, TypeEntretien type, StatutOrdreTravail statutOT, String rechercheVehiculeImmat) {
+        List<Entretien> entretiens = new ArrayList<>();
+        StringBuilder sqlBuilder = new StringBuilder("SELECT e.* FROM ENTRETIEN e LEFT JOIN VEHICULES v ON e.id_vehicule = v.id_vehicule WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+
+        if (dateDebut != null) {
+            sqlBuilder.append(" AND e.date_entree_entr >= ?");
+            params.add(Timestamp.valueOf(dateDebut));
+        }
+        if (dateFin != null) {
+            sqlBuilder.append(" AND e.date_entree_entr <= ?");
+            params.add(Timestamp.valueOf(dateFin));
+        }
+        if (type != null) {
+            sqlBuilder.append(" AND e.type = ?");
+            params.add(type.getDbValue());
+        }
+        if (statutOT != null) {
+            sqlBuilder.append(" AND e.statut_ot = ?");
+            params.add(statutOT.getDbValue());
+        }
+        if (rechercheVehiculeImmat != null && !rechercheVehiculeImmat.trim().isEmpty()) {
+            sqlBuilder.append(" AND v.immatriculation LIKE ?");
+            params.add("%" + rechercheVehiculeImmat + "%");
+        }
+        sqlBuilder.append(" ORDER BY e.date_entree_entr DESC");
+
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sqlBuilder.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                pstmt.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    entretiens.add(mapResultSetToEntretien(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la recherche filtrée d'entretiens.", e);
+            throw new ErreurBaseDeDonnees("Impossible de rechercher les entretiens avec les filtres spécifiés.", e);
+        }
+        return entretiens;
+    }
+
+    public List<SocietaireCompte> rechercherComptesSocietaires(String rechercheNomOuNumero) {
+        List<SocietaireCompte> comptes = new ArrayList<>();
+        String sql = "SELECT * FROM SOCIETAIRE_COMPTE WHERE nom LIKE ? OR numero LIKE ? ORDER BY nom";
+        try (Connection conn = dbUtil.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            String recherchePattern = "%" + (rechercheNomOuNumero == null ? "" : rechercheNomOuNumero) + "%";
+            pstmt.setString(1, recherchePattern);
+            pstmt.setString(2, recherchePattern);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    comptes.add(mapResultSetToSocietaireCompte(rs));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la recherche de comptes sociétaires.", e);
+            throw new ErreurBaseDeDonnees("Impossible de rechercher les comptes sociétaires.", e);
+        }
+        return comptes;
+    }
+}

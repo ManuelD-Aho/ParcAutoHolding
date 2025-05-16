@@ -25,9 +25,10 @@ import main.java.com.miage.parcauto.AppModels.DocumentSocietaire;
 import main.java.com.miage.parcauto.AppModels.SocietaireCompte;
 import main.java.com.miage.parcauto.AppModels.TypeDocumentSocietaire;
 import main.java.com.miage.parcauto.AppModels.RoleUtilisateur;
-import main.java.com.miage.parcauto.AppDataTransferObjects.DocumentSocietaireDTO; // Supposons un DTO
+import main.java.com.miage.parcauto.AppDataTransferObjects.DocumentSocietaireDTO;
 import main.java.com.miage.parcauto.AppExceptions.*;
 
+import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -57,17 +58,17 @@ public class DocumentPanelController implements ViewController.InitializableServ
 
     @FXML private TableView<DocumentSocietaireDTO> tableVueDocuments;
     @FXML private TableColumn<DocumentSocietaireDTO, Integer> colIdDocumentTable;
-    @FXML private TableColumn<DocumentSocietaireDTO, String> colNomSocietaireDocTable; // DTO devra avoir nom sociétaire
+    @FXML private TableColumn<DocumentSocietaireDTO, String> colNomSocietaireDocTable;
     @FXML private TableColumn<DocumentSocietaireDTO, String> colTypeDocumentTable;
-    @FXML private TableColumn<DocumentSocietaireDTO, String> colCheminFichierDocTable; // Ou juste nom du fichier
+    @FXML private TableColumn<DocumentSocietaireDTO, String> colCheminFichierDocTable;
     @FXML private TableColumn<DocumentSocietaireDTO, String> colDateUploadDocTable;
 
     @FXML private Button boutonUploaderDocument;
-    @FXML private Button boutonTelechargerDocument; // Ou Visualiser
+    @FXML private Button boutonTelechargerDocument;
     @FXML private Button boutonSupprimerDocument;
     @FXML private Button boutonActualiserListeDocuments;
 
-    @FXML private ChoiceBox<SocietaireCompte> choiceBoxFiltreSocietaireDoc; // Pour filtrer par sociétaire (si admin)
+    @FXML private ChoiceBox<SocietaireCompte> choiceBoxFiltreSocietaireDoc;
     @FXML private ChoiceBox<TypeDocumentSocietaire> choiceBoxFiltreTypeDoc;
     @FXML private Label labelSocietaireConcerne;
 
@@ -111,11 +112,11 @@ public class DocumentPanelController implements ViewController.InitializableServ
 
     private void configurerColonnesTableDocuments() {
         colIdDocumentTable.setCellValueFactory(new PropertyValueFactory<>("idDoc"));
-        colNomSocietaireDocTable.setCellValueFactory(new PropertyValueFactory<>("nomSocietaire")); // DTO doit avoir ce champ
+        colNomSocietaireDocTable.setCellValueFactory(new PropertyValueFactory<>("nomSocietaire"));
         colTypeDocumentTable.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getTypeDoc() != null ? cellData.getValue().getTypeDoc().getDbValue() : "N/A"
         ));
-        colCheminFichierDocTable.setCellValueFactory(new PropertyValueFactory<>("nomFichier")); // DTO: juste le nom, pas le chemin complet
+        colCheminFichierDocTable.setCellValueFactory(new PropertyValueFactory<>("nomFichier"));
         colDateUploadDocTable.setCellValueFactory(cellData -> new SimpleStringProperty(
                 cellData.getValue().getDateUpload() != null ? cellData.getValue().getDateUpload().format(ViewController.FORMATTEUR_DATETIME_STANDARD_VUE) : "N/A"
         ));
@@ -127,10 +128,15 @@ public class DocumentPanelController implements ViewController.InitializableServ
         boolean estAdminOuEquivalent = gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_CONSULTER_TOUS);
 
         if (estAdminOuEquivalent) {
+            labelSocietaireConcerne.setText("");
+            labelSocietaireConcerne.setVisible(false);
+            labelSocietaireConcerne.setManaged(false);
+            choiceBoxFiltreSocietaireDoc.setVisible(true);
+            choiceBoxFiltreSocietaireDoc.setManaged(true);
             try {
                 List<SocietaireCompte> societaires = servicePersistance.trouverTousLesSocietairesComptes();
                 ObservableList<SocietaireCompte> societaireOptions = FXCollections.observableArrayList(societaires);
-                societaireOptions.add(0, null); // Option "Tous les sociétaires"
+                societaireOptions.add(0, null);
                 choiceBoxFiltreSocietaireDoc.setItems(societaireOptions);
                 choiceBoxFiltreSocietaireDoc.setConverter(new StringConverter<SocietaireCompte>() {
                     @Override public String toString(SocietaireCompte sc) { return sc == null ? "Tous les sociétaires" : sc.getNom() + " (N°" + sc.getNumero() + ")"; }
@@ -143,19 +149,20 @@ public class DocumentPanelController implements ViewController.InitializableServ
         } else {
             choiceBoxFiltreSocietaireDoc.setVisible(false);
             choiceBoxFiltreSocietaireDoc.setManaged(false);
-            // Pour un U3, on affiche ses propres documents par défaut
+            labelSocietaireConcerne.setVisible(true);
+            labelSocietaireConcerne.setManaged(true);
             Integer idPersonnelConnecte = SessionManager.obtenirIdPersonnelUtilisateurActuel();
-            if (idPersonnelConnecte != null) {
+            if (idPersonnelConnecte != null && role == RoleUtilisateur.U3) {
                 SocietaireCompte sc = servicePersistance.trouverSocietaireCompteParIdPersonnel(idPersonnelConnecte);
-                if (sc != null) labelSocietaireConcerne.setText("Documents pour : " + sc.getNom());
-                else labelSocietaireConcerne.setText("Aucun compte sociétaire associé.");
+                if (sc != null) labelSocietaireConcerne.setText("Vos Documents (Sociétaire: " + sc.getNom() + ")");
+                else labelSocietaireConcerne.setText("Aucun compte sociétaire associé à votre profil.");
             } else {
-                labelSocietaireConcerne.setText("Utilisateur non sociétaire.");
+                labelSocietaireConcerne.setText("Accès aux documents non applicable.");
             }
         }
 
         ObservableList<TypeDocumentSocietaire> typesDoc = FXCollections.observableArrayList(TypeDocumentSocietaire.values());
-        typesDoc.add(0, null); // Option "Tous les types"
+        typesDoc.add(0, null);
         choiceBoxFiltreTypeDoc.setItems(typesDoc);
         choiceBoxFiltreTypeDoc.setConverter(new StringConverter<TypeDocumentSocietaire>() {
             @Override public String toString(TypeDocumentSocietaire td) { return td == null ? "Tous les types" : td.getDbValue(); }
@@ -172,24 +179,21 @@ public class DocumentPanelController implements ViewController.InitializableServ
                     .stream().filter(Objects::nonNull).forEach(b -> b.setDisable(true));
             return;
         }
-        // L'upload est permis si l'utilisateur peut gérer ses propres documents OU s'il est admin.
-        // Le choix du sociétaire pour l'upload se fera dans le formulaire d'upload si admin.
         boolean peutUploader = gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_UPLOAD_PROPRES) ||
-                gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_CONSULTER_TOUS); // Admin peut uploader pour d'autres
+                gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_CONSULTER_TOUS);
         if (boutonUploaderDocument != null) boutonUploaderDocument.setDisable(!peutUploader);
     }
 
     private void configurerEtatBoutonsContextuelsDocuments(DocumentSocietaireDTO docSelectionne) {
         boolean aucuneSelection = docSelectionne == null;
         RoleUtilisateur role = SessionManager.obtenirRoleUtilisateurActuel();
-        boolean peutTelecharger = !aucuneSelection; // Tous ceux qui voient peuvent télécharger/visualiser
+        boolean peutTelecharger = !aucuneSelection;
         boolean peutSupprimer = false;
 
-        if (!aucuneSelection) {
-            if (gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_CONSULTER_TOUS)) { // Admin peut tout supprimer
+        if (!aucuneSelection && role != null) {
+            if (gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_CONSULTER_TOUS)) {
                 peutSupprimer = true;
             } else if (gestionnaireSecurite.estAutorise(role, Permissions.DOCUMENT_SUPPRIMER_PROPRES)) {
-                // Vérifier si le document appartient à l'utilisateur connecté (U3)
                 Integer idPersonnelSession = SessionManager.obtenirIdPersonnelUtilisateurActuel();
                 if (idPersonnelSession != null) {
                     SocietaireCompte scSession = servicePersistance.trouverSocietaireCompteParIdPersonnel(idPersonnelSession);
@@ -215,16 +219,16 @@ public class DocumentPanelController implements ViewController.InitializableServ
             if (estAdminOuEquivalent) {
                 SocietaireCompte scFiltre = choiceBoxFiltreSocietaireDoc.getValue();
                 if (scFiltre != null) idSocietaireFiltre = scFiltre.getIdSocietaire();
-            } else { // Pour U3, on filtre sur son propre idSocietaire
+            } else {
                 Integer idPersonnelConnecte = SessionManager.obtenirIdPersonnelUtilisateurActuel();
-                if (idPersonnelConnecte != null) {
+                if (idPersonnelConnecte != null && role == RoleUtilisateur.U3) {
                     SocietaireCompte scConnecte = servicePersistance.trouverSocietaireCompteParIdPersonnel(idPersonnelConnecte);
                     if (scConnecte != null) idSocietaireFiltre = scConnecte.getIdSocietaire();
-                    else { // U3 non lié à un compte sociétaire ne voit rien
+                    else {
                         tableVueDocuments.setItems(FXCollections.emptyObservableList());
                         return;
                     }
-                } else { // Non U3 et non admin ne voit rien (ou logique à affiner)
+                } else {
                     tableVueDocuments.setItems(FXCollections.emptyObservableList());
                     return;
                 }
@@ -232,7 +236,6 @@ public class DocumentPanelController implements ViewController.InitializableServ
 
             TypeDocumentSocietaire typeDocFiltre = choiceBoxFiltreTypeDoc.getValue();
             List<DocumentSocietaire> documentsModel = serviceLogiqueMetier.rechercherDocumentsSocietaires(idSocietaireFiltre, typeDocFiltre);
-            // DataMapper.convertirVersListeDeDocumentSocietaireDTO(documentsModel, servicePersistance) à créer
             List<DocumentSocietaireDTO> documentsDto = DataMapper.convertirVersListeDeDocumentSocietaireDTO(documentsModel, servicePersistance);
             tableVueDocuments.setItems(FXCollections.observableArrayList(documentsDto));
             tableVueDocuments.refresh();
@@ -253,7 +256,7 @@ public class DocumentPanelController implements ViewController.InitializableServ
     private void ouvrirDialogueFormulaireDocument() {
         try {
             String titreDialogue = "Uploader un Nouveau Document Sociétaire";
-            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireDocumentView.fxml"; // FXML à créer
+            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireDocumentView.fxml";
             URL urlFxml = getClass().getResource(cheminFxmlFormulaire);
             if (urlFxml == null) throw new IOException("Fichier FXML du formulaire document introuvable: " + cheminFxmlFormulaire);
 
@@ -292,18 +295,37 @@ public class DocumentPanelController implements ViewController.InitializableServ
             return;
         }
         try {
-            Path cheminFichierStocke = Paths.get(docSelectionne.getCheminFichierComplet()); // DTO doit fournir le chemin complet
+            Path cheminFichierStocke = Paths.get(docSelectionne.getCheminFichierComplet());
             if (Files.exists(cheminFichierStocke) && Files.isReadable(cheminFichierStocke)) {
-                // Pour une visualisation simple, on pourrait utiliser Desktop.getDesktop().open(file)
-                // Pour un téléchargement, on utilise FileChooser pour "Enregistrer sous"
                 FileChooser fileChooser = new FileChooser();
                 fileChooser.setTitle("Enregistrer le document sous...");
-                fileChooser.setInitialFileName(docSelectionne.getNomFichier()); // DTO doit avoir le nom original
+                fileChooser.setInitialFileName(docSelectionne.getNomFichier());
+
+                // Suggest extension based on the original file or type
+                String nomFichierOriginal = docSelectionne.getNomFichier();
+                int lastDot = nomFichierOriginal.lastIndexOf('.');
+                if (lastDot > 0 && lastDot < nomFichierOriginal.length() - 1) {
+                    String extension = nomFichierOriginal.substring(lastDot + 1);
+                    fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(extension.toUpperCase() + " Fichier", "*." + extension));
+                }
+                fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Tous les fichiers", "*.*"));
+
+
                 File fichierDestination = fileChooser.showSaveDialog(MainApp.getPrimaryStage());
 
                 if (fichierDestination != null) {
                     Files.copy(cheminFichierStocke, fichierDestination.toPath(), StandardCopyOption.REPLACE_EXISTING);
                     afficherNotificationAlerteInterface("Téléchargement Réussi", "Document '" + docSelectionne.getNomFichier() + "' enregistré.", Alert.AlertType.INFORMATION);
+
+                    // Option pour ouvrir le fichier après sauvegarde
+                    Optional<ButtonType> reponseOuverture = afficherDialogueConfirmationInterface("Ouvrir Fichier", "Voulez-vous ouvrir le fichier téléchargé '" + fichierDestination.getName() + "'?", ButtonType.YES, ButtonType.NO);
+                    if (reponseOuverture.isPresent() && reponseOuverture.get() == ButtonType.YES) {
+                        if (Desktop.isDesktopSupported()) {
+                            Desktop.getDesktop().open(fichierDestination);
+                        } else {
+                            afficherNotificationAlerteInterface("Ouverture Impossible", "L'ouverture automatique de fichiers n'est pas supportée sur ce système.", Alert.AlertType.INFORMATION);
+                        }
+                    }
                 }
             } else {
                 throw new IOException("Fichier document introuvable ou illisible sur le serveur : " + docSelectionne.getCheminFichierComplet());
@@ -323,10 +345,10 @@ public class DocumentPanelController implements ViewController.InitializableServ
         }
 
         Optional<ButtonType> reponse = afficherDialogueConfirmationInterface("Confirmation de Suppression",
-                "Êtes-vous sûr de vouloir supprimer le document '" + docSelectionne.getNomFichier() + "' (Type: " + docSelectionne.getTypeDoc().getDbValue() + ") ?");
-        if (reponse.isPresent() && reponse.get() == ButtonType.OK) {
+                "Êtes-vous sûr de vouloir supprimer le document '" + docSelectionne.getNomFichier() + "' (Type: " + docSelectionne.getTypeDoc().getDbValue() + ") ?\nCette action est irréversible.", ButtonType.YES, ButtonType.CANCEL);
+        if (reponse.isPresent() && reponse.get() == ButtonType.YES) {
             try {
-                serviceLogiqueMetier.supprimerDocumentSocietaire(docSelectionne.getIdDoc(), docSelectionne.getCheminFichierComplet()); // BusinessLogic gère suppression fichier + BDD
+                serviceLogiqueMetier.supprimerDocumentSocietaire(docSelectionne.getIdDoc(), docSelectionne.getCheminFichierComplet());
                 actionActualiserListeDocuments();
                 afficherNotificationAlerteInterface("Suppression Réussie", "Le document a été supprimé.", Alert.AlertType.INFORMATION);
             } catch (ErreurLogiqueMetier | IOException e) {
@@ -345,5 +367,20 @@ public class DocumentPanelController implements ViewController.InitializableServ
             alerte.initOwner(stagePrincipal);
         }
         alerte.showAndWait();
+    }
+
+    private Optional<ButtonType> afficherDialogueConfirmationInterface(String titre, String message, ButtonType... buttonTypes) {
+        Alert dialogue = new Alert(Alert.AlertType.CONFIRMATION);
+        dialogue.setTitle(titre);
+        dialogue.setHeaderText(null);
+        dialogue.setContentText(message);
+        if (buttonTypes != null && buttonTypes.length > 0) {
+            dialogue.getButtonTypes().setAll(buttonTypes);
+        } // Sinon, utilise OK et CANCEL par défaut
+        Stage stagePrincipal = MainApp.getPrimaryStage();
+        if (stagePrincipal != null && stagePrincipal.getScene() != null && stagePrincipal.isShowing()) {
+            dialogue.initOwner(stagePrincipal);
+        }
+        return dialogue.showAndWait();
     }
 }

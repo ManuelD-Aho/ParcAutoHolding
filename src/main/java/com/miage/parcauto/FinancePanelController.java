@@ -27,8 +27,8 @@ import main.java.com.miage.parcauto.AppModels.SocietaireCompte;
 import main.java.com.miage.parcauto.AppModels.Mouvement;
 import main.java.com.miage.parcauto.AppModels.TypeMouvement;
 import main.java.com.miage.parcauto.AppModels.RoleUtilisateur;
-import main.java.com.miage.parcauto.AppDataTransferObjects.SocietaireCompteDTO; // Supposons un DTO pour SocietaireCompte
-import main.java.com.miage.parcauto.AppDataTransferObjects.MouvementDTO; // Supposons un DTO pour Mouvement
+import main.java.com.miage.parcauto.AppDataTransferObjects.SocietaireCompteDTO;
+import main.java.com.miage.parcauto.AppDataTransferObjects.MouvementDTO;
 import main.java.com.miage.parcauto.AppExceptions.*;
 
 import java.io.IOException;
@@ -95,7 +95,7 @@ public class FinancePanelController implements ViewController.InitializableServi
         tableVueComptesSocietaires.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             configurerEtatBoutonsContextuelsFinances(newSelection);
             if (newSelection != null) {
-                labelSocietaireSelectionnePourMouvements.setText("Mouvements pour : " + newSelection.getNom() + " (N° " + newSelection.getNumeroCompte() + ")");
+                labelSocietaireSelectionnePourMouvements.setText("Mouvements pour : " + newSelection.getNomSocietaire() + " (N° " + newSelection.getNumeroCompte() + ")");
                 chargerMouvementsPourSocietaire(newSelection.getIdSocietaire());
             } else {
                 labelSocietaireSelectionnePourMouvements.setText("Sélectionnez un sociétaire pour voir ses mouvements");
@@ -134,10 +134,9 @@ public class FinancePanelController implements ViewController.InitializableServi
             return;
         }
         boolean peutGererComptesTous = gestionnaireSecurite.estAutorise(role, Permissions.FINANCE_GERER_OPERATIONS_TOUS_COMPTES);
-        boolean peutOpererPropreCompte = gestionnaireSecurite.estAutorise(role, Permissions.FINANCE_EFFECTUER_DEPOT_RETRAIT_PROPRE_COMPTE);
 
         if (boutonCreerCompteSocietaire != null) boutonCreerCompteSocietaire.setDisable(!peutGererComptesTous);
-        // Les autres boutons sont contextuels
+        configurerEtatBoutonsContextuelsFinances(null);
     }
 
     private void configurerEtatBoutonsContextuelsFinances(SocietaireCompteDTO compteSelectionne) {
@@ -146,10 +145,9 @@ public class FinancePanelController implements ViewController.InitializableServi
         boolean peutGererComptesTous = gestionnaireSecurite.estAutorise(role, Permissions.FINANCE_GERER_OPERATIONS_TOUS_COMPTES);
         boolean peutOpererSurCeCompte = false;
 
-        if (!aucuneSelection) {
+        if (!aucuneSelection && role == RoleUtilisateur.U3) { // Sociétaire
             Integer idPersonnelSession = SessionManager.obtenirIdPersonnelUtilisateurActuel();
-            // Si l'utilisateur est un U3 (sociétaire) et que le compte sélectionné est le sien (via idPersonnel)
-            if (role == RoleUtilisateur.U3 && idPersonnelSession != null && idPersonnelSession.equals(compteSelectionne.getIdPersonnelAssocie())) {
+            if (idPersonnelSession != null && idPersonnelSession.equals(compteSelectionne.getIdPersonnelAssocie())) {
                 peutOpererSurCeCompte = gestionnaireSecurite.estAutorise(role, Permissions.FINANCE_EFFECTUER_DEPOT_RETRAIT_PROPRE_COMPTE);
             }
         }
@@ -164,12 +162,27 @@ public class FinancePanelController implements ViewController.InitializableServi
         CONTROLEUR_FINANCE_LOGGER.info("Tentative d'actualisation de la liste des comptes sociétaires.");
         try {
             String recherche = champRechercheSocietaire.getText();
-            List<SocietaireCompte> comptesModel = serviceLogiqueMetier.rechercherComptesSocietaires(recherche);
-            // Assurez-vous d'avoir une méthode convertirVersListeDeSocietaireCompteDTO dans DataMapper
+            List<SocietaireCompte> comptesModel;
+            RoleUtilisateur role = SessionManager.obtenirRoleUtilisateurActuel();
+
+            if (gestionnaireSecurite.estAutorise(role, Permissions.FINANCE_CONSULTER_COMPTES_SOCIETAIRES)) {
+                comptesModel = serviceLogiqueMetier.rechercherComptesSocietaires(recherche);
+            } else if (gestionnaireSecurite.estAutorise(role, Permissions.FINANCE_CONSULTER_PROPRE_COMPTE)) {
+                Integer idPersonnel = SessionManager.obtenirIdPersonnelUtilisateurActuel();
+                if (idPersonnel != null) {
+                    SocietaireCompte propreCompte = servicePersistance.trouverSocietaireCompteParIdPersonnel(idPersonnel);
+                    comptesModel = (propreCompte != null) ? List.of(propreCompte) : List.of();
+                } else {
+                    comptesModel = List.of();
+                }
+            } else {
+                comptesModel = List.of();
+            }
+
             List<SocietaireCompteDTO> comptesDto = DataMapper.convertirVersListeDeSocietaireCompteDTO(comptesModel, servicePersistance);
             tableVueComptesSocietaires.setItems(FXCollections.observableArrayList(comptesDto));
             tableVueComptesSocietaires.refresh();
-            tableVueMouvementsCompte.setItems(FXCollections.emptyObservableList()); // Vider les mouvements
+            tableVueMouvementsCompte.setItems(FXCollections.emptyObservableList());
             labelSocietaireSelectionnePourMouvements.setText("Sélectionnez un sociétaire");
             configurerEtatBoutonsContextuelsFinances(null);
             CONTROLEUR_FINANCE_LOGGER.info(comptesDto.size() + " comptes sociétaires chargés.");
@@ -182,7 +195,6 @@ public class FinancePanelController implements ViewController.InitializableServi
     private void chargerMouvementsPourSocietaire(int idSocietaire) {
         try {
             List<Mouvement> mouvementsModel = servicePersistance.trouverMouvementsParSocietaireId(idSocietaire);
-            // Assurez-vous d'avoir une méthode convertirVersListeDeMouvementDTO dans DataMapper
             List<MouvementDTO> mouvementsDto = DataMapper.convertirVersListeDeMouvementDTO(mouvementsModel);
             tableVueMouvementsCompte.setItems(FXCollections.observableArrayList(mouvementsDto));
             tableVueMouvementsCompte.refresh();
@@ -219,17 +231,16 @@ public class FinancePanelController implements ViewController.InitializableServi
     private void ouvrirDialogueFormulaireCompteSocietaire(SocietaireCompte compteAEditer) {
         try {
             String titreDialogue = (compteAEditer == null) ? "Créer un Nouveau Compte Sociétaire" : "Modifier le Compte Sociétaire : " + compteAEditer.getNom();
-            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireCompteSocietaireView.fxml"; // FXML à créer
+            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireCompteSocietaireView.fxml";
             URL urlFxml = getClass().getResource(cheminFxmlFormulaire);
             if (urlFxml == null) throw new IOException("Fichier FXML du formulaire compte sociétaire introuvable: " + cheminFxmlFormulaire);
 
             FXMLLoader chargeur = new FXMLLoader(urlFxml);
             Parent racineFormulaire = chargeur.load();
 
-            // Supposons un FormulaireCompteSocietaireController.java
-            // FormulaireCompteSocietaireController controleurFormulaire = chargeur.getController();
-            // controleurFormulaire.injecterDependancesServices(serviceLogiqueMetier, gestionnaireSecurite, moteurRapports, servicePersistance);
-            // controleurFormulaire.preparerFormulairePourEdition(compteAEditer);
+            FormulaireCompteSocietaireController controleurFormulaire = chargeur.getController();
+            controleurFormulaire.injecterDependancesServices(serviceLogiqueMetier, gestionnaireSecurite, moteurRapports, servicePersistance);
+            controleurFormulaire.preparerFormulairePourEdition(compteAEditer);
 
             Stage stageDialogue = new Stage();
             stageDialogue.setTitle(titreDialogue);
@@ -268,14 +279,13 @@ public class FinancePanelController implements ViewController.InitializableServi
     private void ouvrirDialogueFormulaireMouvement(SocietaireCompteDTO compteConcerne, TypeMouvement typeMouvement) {
         try {
             String titreDialogue = typeMouvement.getDbValue() + " sur le Compte de " + compteConcerne.getNomSocietaire();
-            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireMouvementView.fxml"; // FXML à créer
+            String cheminFxmlFormulaire = "/main/java/com/miage/parcauto/fxml/FormulaireMouvementView.fxml";
             URL urlFxml = getClass().getResource(cheminFxmlFormulaire);
             if (urlFxml == null) throw new IOException("Fichier FXML du formulaire mouvement introuvable: " + cheminFxmlFormulaire);
 
             FXMLLoader chargeur = new FXMLLoader(urlFxml);
             Parent racineFormulaire = chargeur.load();
 
-            // Supposons un FormulaireMouvementController.java
             FormulaireMouvementController controleurFormulaire = chargeur.getController();
             controleurFormulaire.injecterDependancesServices(serviceLogiqueMetier, gestionnaireSecurite, moteurRapports, servicePersistance);
             controleurFormulaire.preparerFormulaire(compteConcerne.getIdSocietaire(), typeMouvement);
@@ -291,24 +301,18 @@ public class FinancePanelController implements ViewController.InitializableServi
             stageDialogue.setResizable(false);
 
             stageDialogue.showAndWait();
-            actionActualiserComptesSocietaires(); // Rafraîchir pour voir le nouveau solde et le mouvement
-            // Re-sélectionner le sociétaire pour afficher ses mouvements mis à jour
-            if (compteConcerne != null) {
-                final int idSocietaireAReselectionner = compteConcerne.getIdSocietaire();
-                Platform.runLater(() -> {
-                    tableVueComptesSocietaires.getItems().stream()
-                            .filter(sc -> sc.getIdSocietaire() == idSocietaireAReselectionner)
-                            .findFirst()
-                            .ifPresent(scDto -> {
-                                tableVueComptesSocietaires.getSelectionModel().select(scDto);
-                                tableVueComptesSocietaires.scrollTo(scDto);
-                            });
-                });
-            }
-
-
+            actionActualiserComptesSocietaires();
+            final int idSocietaireAReselectionner = compteConcerne.getIdSocietaire();
+            Platform.runLater(() -> {
+                tableVueComptesSocietaires.getItems().stream()
+                        .filter(sc -> sc.getIdSocietaire() == idSocietaireAReselectionner)
+                        .findFirst()
+                        .ifPresent(scDto -> {
+                            tableVueComptesSocietaires.getSelectionModel().select(scDto);
+                            tableVueComptesSocietaires.scrollTo(scDto);
+                        });
+            });
             CONTROLEUR_FINANCE_LOGGER.info("Dialogue du formulaire mouvement fermé.");
-
         } catch (IOException e) {
             CONTROLEUR_FINANCE_LOGGER.log(Level.SEVERE, "Erreur critique lors de l'ouverture du formulaire mouvement.", e);
             afficherNotificationAlerteInterface("Erreur d'Interface Majeure", "Impossible d'ouvrir le formulaire de mouvement : " + e.getMessage(), Alert.AlertType.ERROR);

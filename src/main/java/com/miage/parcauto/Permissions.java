@@ -1,6 +1,8 @@
 package main.java.com.miage.parcauto;
 
 public final class Permissions {
+    public static final String FINANCE_CONSULTER_PROPRE_COMPTE = "Accès";
+
     private Permissions() {} // Classe utilitaire non instanciable
 
     // Permissions Générales

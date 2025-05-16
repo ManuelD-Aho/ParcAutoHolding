@@ -3,615 +3,632 @@ package main.java.com.miage.parcauto;
 import main.java.com.miage.parcauto.AppModels.*;
 import main.java.com.miage.parcauto.AppExceptions.*;
 
-import java.io.File;
-import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
+
 
 public class BusinessLogicService {
     private final PersistenceService persistenceService;
-    private static final Logger LOGGER_METIER = Logger.getLogger(BusinessLogicService.class.getName());
-    private static final String DOSSIER_STOCKAGE_DOCUMENTS = "documents_societaires_parcauto";
+    private final SecurityManager securityManager; // Changé pour correspondre à l'instanciation
+    private static final Logger BUSINESS_LOGGER = Logger.getLogger(BusinessLogicService.class.getName());
+    private static final String DOSSIER_BASE_DOCUMENTS = "documents_societaires_parcauto";
 
 
-    public BusinessLogicService(PersistenceService persistenceService) {
-        this.persistenceService = Objects.requireNonNull(persistenceService, "Le PersistenceService ne peut pas être nul.");
+    public BusinessLogicService(PersistenceService persistenceService, SecurityManager securityManager) {
+        this.persistenceService = Objects.requireNonNull(persistenceService, "PersistenceService ne peut être nul.");
+        this.securityManager = Objects.requireNonNull(securityManager, "SecurityManager ne peut être nul.");
     }
 
-    public Vehicule creerNouveauVehicule(Vehicule vehicule) {
-        Objects.requireNonNull(vehicule, "L'objet Vehicule ne peut pas être nul.");
-        if (vehicule.getNumeroChassi() == null || vehicule.getNumeroChassi().trim().isEmpty()) {
-            throw new ErreurValidation("Le numéro de châssis du véhicule est requis.");
-        }
-        if (vehicule.getImmatriculation() == null || vehicule.getImmatriculation().trim().isEmpty()) {
-            throw new ErreurValidation("L'immatriculation du véhicule est requise.");
+    public Vehicule creerNouveauVehicule(Vehicule vehicule) throws ErreurValidation, ErreurBaseDeDonnees {
+        Objects.requireNonNull(vehicule, "L'objet Vehicule ne peut pas être nul pour la création.");
+        validerDonneesVehicule(vehicule, true);
+
+        if (persistenceService.trouverVehiculeParImmatriculation(vehicule.getImmatriculation()) != null) {
+            throw new ErreurValidation("Un véhicule avec l'immatriculation '" + vehicule.getImmatriculation() + "' existe déjà.");
         }
         if (persistenceService.trouverVehiculeParNumeroChassi(vehicule.getNumeroChassi()) != null) {
             throw new ErreurValidation("Un véhicule avec le numéro de châssis '" + vehicule.getNumeroChassi() + "' existe déjà.");
         }
-        if (persistenceService.trouverVehiculeParImmatriculation(vehicule.getImmatriculation()) != null) {
-            throw new ErreurValidation("Un véhicule avec l'immatriculation '" + vehicule.getImmatriculation() + "' existe déjà.");
-        }
-
-        if (vehicule.getIdEtatVoiture() == 0) {
-            EtatVoiture etatInitialDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
-            if (etatInitialDisponible != null) {
-                vehicule.setIdEtatVoiture(etatInitialDisponible.getIdEtatVoiture());
-            } else {
-                LOGGER_METIER.warning("L'état 'Disponible' par défaut est introuvable. Le véhicule pourrait être créé sans état valide initial.");
-                throw new ErreurLogiqueMetier("L'état initial par défaut 'Disponible' pour les véhicules n'est pas configuré.");
-            }
-        }
         if (vehicule.getDateEtat() == null) {
             vehicule.setDateEtat(LocalDateTime.now());
         }
+
         return persistenceService.sauvegarderVehicule(vehicule);
     }
 
-    public Vehicule modifierVehicule(Vehicule vehicule) {
+    public Vehicule modifierVehicule(Vehicule vehicule) throws ErreurValidation, ErreurBaseDeDonnees {
         Objects.requireNonNull(vehicule, "L'objet Vehicule ne peut pas être nul pour la modification.");
         if (vehicule.getIdVehicule() == 0) {
-            throw new ErreurValidation("L'identifiant du véhicule est requis pour la modification.");
+            throw new ErreurValidation("L'ID du véhicule doit être spécifié pour une modification.");
         }
-        Vehicule vehiculeExistant = persistenceService.trouverVehiculeParId(vehicule.getIdVehicule());
-        if (vehiculeExistant == null) {
-            throw new ErreurLogiqueMetier("Aucun véhicule trouvé avec l'identifiant " + vehicule.getIdVehicule() + " pour la modification.");
+        validerDonneesVehicule(vehicule, false);
+
+        Vehicule vehiculeExistantImmat = persistenceService.trouverVehiculeParImmatriculation(vehicule.getImmatriculation());
+        if (vehiculeExistantImmat != null && vehiculeExistantImmat.getIdVehicule() != vehicule.getIdVehicule()) {
+            throw new ErreurValidation("Un autre véhicule avec l'immatriculation '" + vehicule.getImmatriculation() + "' existe déjà.");
+        }
+        Vehicule vehiculeExistantChassis = persistenceService.trouverVehiculeParNumeroChassi(vehicule.getNumeroChassi());
+        if (vehiculeExistantChassis != null && vehiculeExistantChassis.getIdVehicule() != vehicule.getIdVehicule()) {
+            throw new ErreurValidation("Un autre véhicule avec le numéro de châssis '" + vehicule.getNumeroChassi() + "' existe déjà.");
+        }
+        if (vehicule.getDateEtat() == null) {
+            Vehicule vExistant = persistenceService.trouverVehiculeParId(vehicule.getIdVehicule());
+            if (vExistant != null) vehicule.setDateEtat(vExistant.getDateEtat());
+            else vehicule.setDateEtat(LocalDateTime.now());
         }
 
-        if (vehicule.getNumeroChassi() != null && !vehiculeExistant.getNumeroChassi().equals(vehicule.getNumeroChassi())) {
-            if (persistenceService.trouverVehiculeParNumeroChassi(vehicule.getNumeroChassi()) != null) {
-                throw new ErreurValidation("Un autre véhicule utilise déjà le numéro de châssis '" + vehicule.getNumeroChassi() + "'.");
-            }
-        }
-        if (vehicule.getImmatriculation() != null && !vehiculeExistant.getImmatriculation().equals(vehicule.getImmatriculation())) {
-            if (persistenceService.trouverVehiculeParImmatriculation(vehicule.getImmatriculation()) != null) {
-                throw new ErreurValidation("Un autre véhicule utilise déjà l'immatriculation '" + vehicule.getImmatriculation() + "'.");
-            }
-        }
-        if (vehiculeExistant.getIdEtatVoiture() != vehicule.getIdEtatVoiture()) {
-            vehicule.setDateEtat(LocalDateTime.now());
-        } else if (vehicule.getDateEtat() == null) { // Si l'état n'a pas changé mais la date est nulle, la mettre à jour
-            vehicule.setDateEtat(vehiculeExistant.getDateEtat() != null ? vehiculeExistant.getDateEtat() : LocalDateTime.now());
-        }
+
         return persistenceService.sauvegarderVehicule(vehicule);
     }
 
-    public void supprimerVehicule(int idVehicule) {
-        if (idVehicule == 0) throw new ErreurValidation("L'identifiant du véhicule est requis pour la suppression.");
+    private void validerDonneesVehicule(Vehicule vehicule, boolean estNouveau) throws ErreurValidation {
+        if (vehicule.getImmatriculation() == null || vehicule.getImmatriculation().trim().isEmpty()) {
+            throw new ErreurValidation("L'immatriculation du véhicule est obligatoire.");
+        }
+        if (vehicule.getNumeroChassi() == null || vehicule.getNumeroChassi().trim().isEmpty()) {
+            throw new ErreurValidation("Le numéro de châssis du véhicule est obligatoire.");
+        }
+        if (vehicule.getMarque() == null || vehicule.getMarque().trim().isEmpty()) {
+            throw new ErreurValidation("La marque du véhicule est obligatoire.");
+        }
+        if (vehicule.getModele() == null || vehicule.getModele().trim().isEmpty()) {
+            throw new ErreurValidation("Le modèle du véhicule est obligatoire.");
+        }
+        if (vehicule.getEnergie() == null) {
+            throw new ErreurValidation("Le type d'énergie du véhicule est obligatoire.");
+        }
+        if (vehicule.getIdEtatVoiture() == 0 && estNouveau) {
+            throw new ErreurValidation("L'état initial du véhicule est obligatoire.");
+        }
+        if (vehicule.getDateAcquisition() != null && vehicule.getDateAcquisition().isAfter(LocalDateTime.now())) {
+            throw new ErreurValidation("La date d'acquisition ne peut être dans le futur.");
+        }
+        if (vehicule.getDateMiseEnService() != null && vehicule.getDateAcquisition() != null && vehicule.getDateMiseEnService().isBefore(vehicule.getDateAcquisition())) {
+            throw new ErreurValidation("La date de mise en service ne peut être antérieure à la date d'acquisition.");
+        }
+        if (vehicule.getPrixVehicule() != null && vehicule.getPrixVehicule().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ErreurValidation("Le prix du véhicule ne peut être négatif.");
+        }
+        if (vehicule.getKmActuels() != null && vehicule.getKmActuels() < 0) {
+            throw new ErreurValidation("Le kilométrage actuel ne peut être négatif.");
+        }
+    }
+
+    public void supprimerVehicule(int idVehicule) throws ErreurLogiqueMetier, ErreurBaseDeDonnees {
         Vehicule vehiculeASupprimer = persistenceService.trouverVehiculeParId(idVehicule);
-        if (vehiculeASupprimer == null) throw new ErreurLogiqueMetier("Aucun véhicule trouvé avec l'ID " + idVehicule + ".");
-
-        if (!persistenceService.trouverMissionsActivesPourVehicule(idVehicule).isEmpty()) {
-            throw new ErreurLogiqueMetier("Impossible de supprimer le véhicule ID " + idVehicule + ": missions actives ou planifiées associées.");
-        }
-        if (!persistenceService.trouverAffectationsActivesPourVehicule(idVehicule).isEmpty()) {
-            throw new ErreurLogiqueMetier("Impossible de supprimer le véhicule ID " + idVehicule + ": affectations en cours.");
+        if (vehiculeASupprimer == null) {
+            throw new ErreurLogiqueMetier("Le véhicule avec l'ID " + idVehicule + " n'existe pas et ne peut être supprimé.");
         }
 
-        persistenceService.supprimerToutesCouverturesPourVehicule(idVehicule);
+        List<Mission> missionsActives = persistenceService.trouverMissionsActivesPourVehicule(idVehicule);
+        if (!missionsActives.isEmpty()) {
+            throw new ErreurLogiqueMetier("Impossible de supprimer le véhicule ID " + idVehicule + " car il a des missions actives ou planifiées.");
+        }
+
+        List<Affectation> affectationsActives = persistenceService.trouverAffectationsActivesPourVehicule(idVehicule);
+        if (!affectationsActives.isEmpty()) {
+            throw new ErreurLogiqueMetier("Impossible de supprimer le véhicule ID " + idVehicule + " car il a des affectations actives.");
+        }
+
+        persistenceService.supprimerToutesMissionsPourVehicule(idVehicule);
         persistenceService.supprimerTousEntretiensPourVehicule(idVehicule);
         persistenceService.supprimerToutesAffectationsPourVehicule(idVehicule);
-        // Les dépenses de mission sont en cascade avec Mission
-        persistenceService.supprimerToutesMissionsPourVehicule(idVehicule);
+        persistenceService.supprimerToutesCouverturesPourVehicule(idVehicule);
+
         persistenceService.supprimerVehiculeParId(idVehicule);
-        LOGGER_METIER.info("Véhicule ID " + idVehicule + " et toutes ses données associées ont été supprimés.");
+        BUSINESS_LOGGER.info("Véhicule ID " + idVehicule + " et toutes ses données associées ont été supprimés.");
     }
 
-    public void changerEtatVehicule(int idVehicule, int idNouvelEtatVoiture, LocalDateTime dateEffectiveChangement) {
-        if (idVehicule == 0 || idNouvelEtatVoiture == 0) throw new ErreurValidation("ID véhicule et ID nouvel état requis.");
+    public Vehicule changerEtatVehicule(int idVehicule, int idNouvelEtatVoiture, LocalDateTime dateChangement) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
         Vehicule vehicule = persistenceService.trouverVehiculeParId(idVehicule);
-        if (vehicule == null) throw new ErreurLogiqueMetier("Véhicule ID " + idVehicule + " introuvable.");
+        if (vehicule == null) {
+            throw new ErreurLogiqueMetier("Véhicule ID " + idVehicule + " non trouvé.");
+        }
         EtatVoiture nouvelEtat = persistenceService.trouverEtatVoitureParId(idNouvelEtatVoiture);
-        if (nouvelEtat == null) throw new ErreurLogiqueMetier("État voiture ID " + idNouvelEtatVoiture + " introuvable.");
-
-        vehicule.setIdEtatVoiture(idNouvelEtatVoiture);
-        vehicule.setDateEtat(Objects.requireNonNullElse(dateEffectiveChangement, LocalDateTime.now()));
-        persistenceService.sauvegarderVehicule(vehicule);
-        LOGGER_METIER.info("État du véhicule ID " + idVehicule + " changé à '" + nouvelEtat.getLibEtatVoiture() + "'.");
-    }
-
-    public List<Vehicule> rechercherVehiculesFiltres(String immatriculationPartielle, String etatLibelleFiltre, EnergieVehicule energieFiltre) {
-        // Cette méthode devra construire une requête SQL dynamique ou appeler une procédure stockée
-        // Pour l'instant, une implémentation simple filtrant en mémoire une liste complète (non optimal pour grosses BDD)
-        List<Vehicule> tousLesVehicules = persistenceService.trouverTousLesVehicules();
-        return tousLesVehicules.stream()
-                .filter(v -> immatriculationPartielle == null || v.getImmatriculation().toLowerCase().contains(immatriculationPartielle.toLowerCase()))
-                .filter(v -> {
-                    if (etatLibelleFiltre == null) return true;
-                    EtatVoiture etat = persistenceService.trouverEtatVoitureParId(v.getIdEtatVoiture());
-                    return etat != null && etat.getLibEtatVoiture().equalsIgnoreCase(etatLibelleFiltre);
-                })
-                .filter(v -> energieFiltre == null || v.getEnergie() == energieFiltre)
-                .collect(Collectors.toList());
-    }
-
-
-    public Mission planifierNouvelleMission(Mission mission) {
-        Objects.requireNonNull(mission, "L'objet Mission ne peut pas être nul.");
-        if (mission.getIdVehicule() == 0) throw new ErreurValidation("Un véhicule doit être assigné à la mission.");
-        if (mission.getDateDebutMission() == null) throw new ErreurValidation("La date de début de mission est requise.");
-
-        Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(mission.getIdVehicule());
-        if (vehiculeConcerne == null) throw new ErreurLogiqueMetier("Véhicule ID " + mission.getIdVehicule() + " introuvable.");
-
-        EtatVoiture etatActuelVehicule = persistenceService.trouverEtatVoitureParId(vehiculeConcerne.getIdEtatVoiture());
-        if (etatActuelVehicule == null || !"Disponible".equalsIgnoreCase(etatActuelVehicule.getLibEtatVoiture())) {
-            throw new ErreurLogiqueMetier("Le véhicule '" + vehiculeConcerne.getImmatriculation() + "' n'est pas disponible (État: " + (etatActuelVehicule != null ? etatActuelVehicule.getLibEtatVoiture() : "Inconnu") + ").");
+        if (nouvelEtat == null) {
+            throw new ErreurValidation("Le nouvel état spécifié (ID: " + idNouvelEtatVoiture + ") est invalide.");
+        }
+        if (dateChangement == null) {
+            dateChangement = LocalDateTime.now();
         }
 
-        EtatVoiture etatEnMission = persistenceService.trouverEtatVoitureParLibelle("En mission");
-        if (etatEnMission == null) throw new ErreurLogiqueMetier("L'état 'En mission' est introuvable dans la configuration.");
+        vehicule.setIdEtatVoiture(idNouvelEtatVoiture);
+        vehicule.setDateEtat(dateChangement);
+        return persistenceService.sauvegarderVehicule(vehicule);
+    }
 
-        // Ne pas changer l'état ici, le faire au démarrage de la mission.
-        // La planification réserve le véhicule, mais il reste "Disponible" jusqu'au démarrage.
+    public Mission planifierNouvelleMission(Mission mission) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Objects.requireNonNull(mission, "L'objet Mission ne peut être nul pour la planification.");
+        validerDonneesMission(mission, true);
+
+        Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(mission.getIdVehicule());
+        if (vehiculeConcerne == null) {
+            throw new ErreurValidation("Le véhicule spécifié pour la mission (ID: " + mission.getIdVehicule() + ") n'existe pas.");
+        }
+        EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
+        if (etatDisponible == null) {
+            throw new ErreurLogiqueMetier("L'état 'Disponible' n'est pas configuré dans le système.");
+        }
+        if (vehiculeConcerne.getIdEtatVoiture() != etatDisponible.getIdEtatVoiture()) {
+            EtatVoiture etatActuel = persistenceService.trouverEtatVoitureParId(vehiculeConcerne.getIdEtatVoiture());
+            throw new ErreurLogiqueMetier("Le véhicule '" + vehiculeConcerne.getImmatriculation() + "' n'est pas disponible (État actuel: " + (etatActuel != null ? etatActuel.getLibEtatVoiture() : "Inconnu") + ").");
+        }
+
         mission.setStatus(StatutMission.PLANIFIEE);
         Mission missionPlanifiee = persistenceService.sauvegarderMission(mission);
-        LOGGER_METIER.info("Mission ID " + missionPlanifiee.getIdMission() + " planifiée pour véhicule ID " + mission.getIdVehicule());
+
+        EtatVoiture etatEnMission = persistenceService.trouverEtatVoitureParLibelle("En mission");
+        if (etatEnMission != null) {
+            changerEtatVehicule(vehiculeConcerne.getIdVehicule(), etatEnMission.getIdEtatVoiture(), mission.getDateDebutMission());
+        } else {
+            BUSINESS_LOGGER.warning("L'état 'En mission' n'est pas configuré. L'état du véhicule n'a pas été modifié automatiquement.");
+        }
         return missionPlanifiee;
     }
 
-    public Mission modifierMissionPlanifiee(Mission mission) {
-        Objects.requireNonNull(mission, "L'objet Mission ne peut pas être nul pour la modification.");
-        if (mission.getIdMission() == 0) throw new ErreurValidation("L'ID de la mission est requis pour la modification.");
+    public Mission modifierMission(Mission mission) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Objects.requireNonNull(mission, "L'objet Mission ne peut être nul pour la modification.");
+        if (mission.getIdMission() == 0) {
+            throw new ErreurValidation("L'ID de la mission doit être spécifié pour une modification.");
+        }
         Mission missionExistante = persistenceService.trouverMissionParId(mission.getIdMission());
-        if (missionExistante == null) throw new ErreurLogiqueMetier("Mission ID " + mission.getIdMission() + " introuvable.");
+        if (missionExistante == null) {
+            throw new ErreurLogiqueMetier("Mission ID " + mission.getIdMission() + " non trouvée.");
+        }
         if (missionExistante.getStatus() != StatutMission.PLANIFIEE) {
             throw new ErreurLogiqueMetier("Seules les missions planifiées peuvent être modifiées. Statut actuel: " + missionExistante.getStatus().getDbValue());
         }
-        // Copier les champs modifiables, en s'assurant que le statut reste PLANIFIEE
-        missionExistante.setLibMission(mission.getLibMission());
-        missionExistante.setIdVehicule(mission.getIdVehicule()); // Peut-être vérifier la dispo du nouveau véhicule
-        missionExistante.setSite(mission.getSite());
-        missionExistante.setDateDebutMission(mission.getDateDebutMission());
-        missionExistante.setDateFinMission(mission.getDateFinMission()); // Date fin *prévue*
-        missionExistante.setKmPrevu(mission.getKmPrevu());
-        missionExistante.setCircuitMission(mission.getCircuitMission());
-        missionExistante.setObservationMission(mission.getObservationMission());
+        validerDonneesMission(mission, false);
 
-        return persistenceService.sauvegarderMission(missionExistante);
+        return persistenceService.sauvegarderMission(mission);
     }
 
-
-    public void demarrerUneMission(int idMission) {
-        if (idMission == 0) throw new ErreurValidation("ID mission requis.");
+    public void annulerMissionPlanifiee(int idMission) throws ErreurLogiqueMetier, ErreurBaseDeDonnees {
         Mission mission = persistenceService.trouverMissionParId(idMission);
-        if (mission == null) throw new ErreurLogiqueMetier("Mission ID " + idMission + " introuvable.");
+        if (mission == null) {
+            throw new ErreurLogiqueMetier("Mission ID " + idMission + " non trouvée.");
+        }
         if (mission.getStatus() != StatutMission.PLANIFIEE) {
-            throw new ErreurLogiqueMetier("La mission doit être 'Planifiée' pour être démarrée. Statut: " + mission.getStatus().getDbValue());
+            throw new ErreurLogiqueMetier("Seules les missions planifiées peuvent être annulées. Statut actuel: " + mission.getStatus().getDbValue());
         }
 
         Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(mission.getIdVehicule());
-        EtatVoiture etatActuelVehicule = persistenceService.trouverEtatVoitureParId(vehiculeConcerne.getIdEtatVoiture());
-        if (etatActuelVehicule == null || !"Disponible".equalsIgnoreCase(etatActuelVehicule.getLibEtatVoiture())) {
-            // Exception si un autre processus a pris le véhicule entre-temps
-            throw new ErreurLogiqueMetier("Le véhicule '" + vehiculeConcerne.getImmatriculation() + "' n'est plus disponible (État: " + (etatActuelVehicule != null ? etatActuelVehicule.getLibEtatVoiture() : "Inconnu") + "). Impossible de démarrer la mission.");
+        if (vehiculeConcerne != null) {
+            EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
+            if (etatDisponible != null) {
+                changerEtatVehicule(vehiculeConcerne.getIdVehicule(), etatDisponible.getIdEtatVoiture(), LocalDateTime.now());
+            } else {
+                BUSINESS_LOGGER.warning("L'état 'Disponible' n'est pas configuré. L'état du véhicule pour la mission annulée n'a pas été modifié.");
+            }
         }
-        EtatVoiture etatEnMission = persistenceService.trouverEtatVoitureParLibelle("En mission");
-        if (etatEnMission == null) throw new ErreurLogiqueMetier("L'état 'En mission' est introuvable.");
-
-        changerEtatVehicule(mission.getIdVehicule(), etatEnMission.getIdEtatVoiture(), LocalDateTime.now());
-
-        mission.setStatus(StatutMission.EN_COURS);
-        // Optionnel: Mettre à jour la date de début réelle si différente de la planifiée
-        // mission.setDateDebutMission(LocalDateTime.now());
-        persistenceService.sauvegarderMission(mission);
-        LOGGER_METIER.info("Mission ID " + idMission + " démarrée.");
+        persistenceService.supprimerMissionParId(idMission);
+        BUSINESS_LOGGER.info("Mission ID " + idMission + " annulée.");
     }
 
-    public void cloturerUneMission(int idMission, Integer kmReel, BigDecimal coutTotal, List<DepenseMission> depenses) {
-        if (idMission == 0) throw new ErreurValidation("ID mission requis.");
-        Mission mission = persistenceService.trouverMissionParId(idMission);
-        if (mission == null) throw new ErreurLogiqueMetier("Mission ID " + idMission + " introuvable.");
-        if (mission.getStatus() != StatutMission.EN_COURS) {
-            throw new ErreurLogiqueMetier("La mission doit être 'En Cours' pour être clôturée. Statut: " + mission.getStatus().getDbValue());
+
+    private void validerDonneesMission(Mission mission, boolean estNouvelle) throws ErreurValidation {
+        if (mission.getLibMission() == null || mission.getLibMission().trim().isEmpty()) {
+            throw new ErreurValidation("Le libellé de la mission est obligatoire.");
         }
-        if (kmReel == null || kmReel < 0) throw new ErreurValidation("Kilométrage réel positif ou nul requis.");
+        if (mission.getIdVehicule() == 0) {
+            throw new ErreurValidation("Un véhicule doit être assigné à la mission.");
+        }
+        if (mission.getDateDebutMission() == null) {
+            throw new ErreurValidation("La date de début de la mission est obligatoire.");
+        }
+        if (mission.getDateDebutMission().isBefore(LocalDateTime.now().minusDays(1)) && estNouvelle) {
+            throw new ErreurValidation("La date de début de la mission ne peut pas être dans le passé lointain.");
+        }
+        if (mission.getDateFinMission() != null && mission.getDateFinMission().isBefore(mission.getDateDebutMission())) {
+            throw new ErreurValidation("La date de fin prévue de la mission ne peut être antérieure à sa date de début.");
+        }
+        if (mission.getKmPrevu() != null && mission.getKmPrevu() < 0) {
+            throw new ErreurValidation("Le kilométrage prévu ne peut être négatif.");
+        }
+    }
 
-        mission.setStatus(StatutMission.CLOTUREE);
+    public Mission demarrerUneMission(int idMission) throws ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Mission mission = persistenceService.trouverMissionParId(idMission);
+        if (mission == null) {
+            throw new ErreurLogiqueMetier("Mission ID " + idMission + " non trouvée.");
+        }
+        if (mission.getStatus() != StatutMission.PLANIFIEE) {
+            throw new ErreurLogiqueMetier("La mission ne peut être démarrée que si son statut est 'Planifiée'. Statut actuel: " + mission.getStatus().getDbValue());
+        }
+        mission.setStatus(StatutMission.EN_COURS);
+        return persistenceService.sauvegarderMission(mission);
+    }
+
+    public Mission cloturerUneMission(int idMission, Integer kmReel, BigDecimal coutTotalCalcule, List<DepenseMission> depenses) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Mission mission = persistenceService.trouverMissionParId(idMission);
+        if (mission == null) {
+            throw new ErreurLogiqueMetier("Mission ID " + idMission + " non trouvée.");
+        }
+        if (mission.getStatus() != StatutMission.EN_COURS) {
+            throw new ErreurLogiqueMetier("La mission ne peut être clôturée que si son statut est 'En cours'. Statut actuel: " + mission.getStatus().getDbValue());
+        }
+        if (kmReel == null || kmReel < 0) {
+            throw new ErreurValidation("Le kilométrage réel est obligatoire pour clôturer la mission et ne peut être négatif.");
+        }
+        Vehicule vehicule = persistenceService.trouverVehiculeParId(mission.getIdVehicule());
+        if (vehicule == null) {
+            throw new ErreurLogiqueMetier("Véhicule associé à la mission (ID: " + mission.getIdVehicule() + ") introuvable.");
+        }
+
         mission.setKmReel(kmReel);
-        mission.setCoutTotal(coutTotal); // Peut être null
-        mission.setDateFinMission(LocalDateTime.now()); // Date de fin réelle
-        persistenceService.sauvegarderMission(mission); // Le trigger SQL met à jour VEHICULES.km_actuels
+        mission.setDateFinMission(LocalDateTime.now());
+        mission.setStatus(StatutMission.CLOTUREE);
 
-        if (depenses != null) {
+        persistenceService.supprimerToutesDepensesPourMission(idMission); // Supprimer les anciennes avant d'ajouter les nouvelles
+
+        BigDecimal coutDepenses = BigDecimal.ZERO;
+        if (depenses != null && !depenses.isEmpty()) {
             for (DepenseMission depense : depenses) {
+                if (depense.getMontant() == null || depense.getMontant().compareTo(BigDecimal.ZERO) < 0) {
+                    throw new ErreurValidation("Le montant d'une dépense ne peut être nul ou négatif.");
+                }
+                if (depense.getNature() == null) {
+                    throw new ErreurValidation("La nature d'une dépense est obligatoire.");
+                }
                 depense.setIdMission(idMission);
                 persistenceService.sauvegarderDepenseMission(depense);
+                coutDepenses = coutDepenses.add(depense.getMontant());
             }
         }
 
+        mission.setCoutTotal(coutTotalCalcule != null ? coutTotalCalcule : coutDepenses);
+
+        Mission missionCloturee = persistenceService.sauvegarderMission(mission);
+
+        vehicule.setKmActuels(vehicule.getKmActuels() != null ? vehicule.getKmActuels() + kmReel : kmReel); // Mise à jour cumulative
         EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
-        if (etatDisponible == null) throw new ErreurLogiqueMetier("L'état 'Disponible' est introuvable.");
-        changerEtatVehicule(mission.getIdVehicule(), etatDisponible.getIdEtatVoiture(), LocalDateTime.now());
-        LOGGER_METIER.info("Mission ID " + idMission + " clôturée. Véhicule remis à 'Disponible'.");
-    }
-
-    public void annulerMissionPlanifiee(int idMission) {
-        if (idMission == 0) throw new ErreurValidation("ID mission requis.");
-        Mission mission = persistenceService.trouverMissionParId(idMission);
-        if (mission == null) throw new ErreurLogiqueMetier("Mission ID " + idMission + " introuvable.");
-        if (mission.getStatus() != StatutMission.PLANIFIEE) {
-            throw new ErreurLogiqueMetier("Seule une mission 'Planifiée' peut être annulée. Statut: " + mission.getStatus().getDbValue());
+        if (etatDisponible != null) {
+            changerEtatVehicule(vehicule.getIdVehicule(), etatDisponible.getIdEtatVoiture(), LocalDateTime.now());
+        } else {
+            BUSINESS_LOGGER.warning("L'état 'Disponible' n'est pas configuré. L'état du véhicule après mission n'a pas été modifié.");
         }
-        // Supprimer la mission. Si le véhicule avait été mis "En mission" par erreur à la planification,
-        // il faudrait le remettre "Disponible". Mais la logique actuelle le fait au démarrage.
-        // Donc, juste supprimer la mission suffit.
-        persistenceService.supprimerToutesDepensesPourMission(idMission); // Méthode à créer dans PersistenceService
-        persistenceService.supprimerMissionParId(idMission); // Méthode à créer dans PersistenceService
-        LOGGER_METIER.info("Mission planifiée ID " + idMission + " annulée et supprimée.");
-    }
+        persistenceService.sauvegarderVehicule(vehicule);
 
-    public List<Mission> rechercherMissionsFiltrees(LocalDateTime dateDebutPeriode, LocalDateTime dateFinPeriode, StatutMission statutFiltre, String rechercheVehiculeImmat) {
-        // Implémentation simplifiée, filtrage en mémoire. Une requête SQL optimisée serait préférable.
-        List<Mission> toutesLesMissions = persistenceService.trouverToutesLesMissions(); // Méthode à créer
-        return toutesLesMissions.stream()
-                .filter(m -> dateDebutPeriode == null || !m.getDateDebutMission().isBefore(dateDebutPeriode))
-                .filter(m -> dateFinPeriode == null || (m.getDateFinMission() != null && !m.getDateFinMission().isAfter(dateFinPeriode)) || (m.getDateFinMission() == null && !m.getDateDebutMission().isAfter(dateFinPeriode)))
-                .filter(m -> statutFiltre == null || m.getStatus() == statutFiltre)
-                .filter(m -> {
-                    if (rechercheVehiculeImmat == null || rechercheVehiculeImmat.trim().isEmpty()) return true;
-                    Vehicule v = persistenceService.trouverVehiculeParId(m.getIdVehicule());
-                    return v != null && v.getImmatriculation().toLowerCase().contains(rechercheVehiculeImmat.toLowerCase());
-                })
-                .collect(Collectors.toList());
+        return missionCloturee;
     }
 
 
-    public Entretien creerNouvelEntretien(Entretien entretien) {
+    public Entretien creerNouvelEntretien(Entretien entretien) throws ErreurValidation, ErreurBaseDeDonnees {
         Objects.requireNonNull(entretien, "L'objet Entretien ne peut être nul.");
-        if (entretien.getIdVehicule() == 0) throw new ErreurValidation("Un véhicule doit être sélectionné pour l'entretien.");
-        if (entretien.getDateEntreeEntr() == null) throw new ErreurValidation("La date d'entrée en entretien est requise.");
-        if (entretien.getMotifEntr() == null || entretien.getMotifEntr().trim().isEmpty()) throw new ErreurValidation("Le motif est requis.");
-        if (entretien.getType() == null) throw new ErreurValidation("Le type d'entretien est requis.");
+        validerDonneesEntretien(entretien);
 
-        if (entretien.getStatutOt() == null) entretien.setStatutOt(StatutOrdreTravail.OUVERT);
-
-        // Si l'entretien est créé et que le véhicule n'est pas déjà "En entretien" ou "Panne", le mettre "En entretien"
-        Vehicule vehicule = persistenceService.trouverVehiculeParId(entretien.getIdVehicule());
-        if (vehicule != null) {
-            EtatVoiture etatActuel = persistenceService.trouverEtatVoitureParId(vehicule.getIdEtatVoiture());
-            if (etatActuel != null && !"En entretien".equalsIgnoreCase(etatActuel.getLibEtatVoiture()) && !"Panne".equalsIgnoreCase(etatActuel.getLibEtatVoiture())) {
-                EtatVoiture etatEnEntretien = persistenceService.trouverEtatVoitureParLibelle("En entretien");
-                if (etatEnEntretien != null) {
-                    changerEtatVehicule(vehicule.getIdVehicule(), etatEnEntretien.getIdEtatVoiture(), entretien.getDateEntreeEntr());
-                } else {
-                    LOGGER_METIER.warning("L'état 'En entretien' est introuvable. L'état du véhicule ne sera pas mis à jour.");
-                }
-            }
+        Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(entretien.getIdVehicule());
+        if (vehiculeConcerne == null) {
+            throw new ErreurValidation("Véhicule ID " + entretien.getIdVehicule() + " non trouvé pour l'entretien.");
         }
-        return persistenceService.sauvegarderEntretien(entretien);
+        if (entretien.getStatutOt() == null) {
+            entretien.setStatutOt(StatutOrdreTravail.OUVERT);
+        }
+        Entretien entretienCree = persistenceService.sauvegarderEntretien(entretien);
+
+        EtatVoiture etatEnEntretien = persistenceService.trouverEtatVoitureParLibelle("En entretien");
+        if (etatEnEntretien != null && entretien.getDateSortieEntr() == null) {
+            changerEtatVehicule(vehiculeConcerne.getIdVehicule(), etatEnEntretien.getIdEtatVoiture(), entretien.getDateEntreeEntr());
+        }
+        return entretienCree;
     }
 
-    public Entretien modifierEntretien(Entretien entretien) {
-        Objects.requireNonNull(entretien, "L'objet Entretien ne peut être nul pour la modification.");
-        if (entretien.getIdEntretien() == 0) throw new ErreurValidation("L'ID de l'entretien est requis.");
+    public Entretien modifierEntretien(Entretien entretien) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Objects.requireNonNull(entretien, "L'objet Entretien ne peut être nul.");
+        if (entretien.getIdEntretien() == 0) {
+            throw new ErreurValidation("L'ID de l'entretien est requis pour la modification.");
+        }
         Entretien entretienExistant = persistenceService.trouverEntretienParId(entretien.getIdEntretien());
-        if (entretienExistant == null) throw new ErreurLogiqueMetier("Entretien ID " + entretien.getIdEntretien() + " introuvable.");
-        if (entretienExistant.getStatutOt() == StatutOrdreTravail.CLOTURE) {
-            throw new ErreurLogiqueMetier("Un entretien clôturé ne peut pas être modifié.");
+        if (entretienExistant == null) {
+            throw new ErreurLogiqueMetier("Entretien ID " + entretien.getIdEntretien() + " non trouvé.");
         }
-        // Copier les champs modifiables. Le statut OT est géré par une autre méthode.
-        entretienExistant.setIdVehicule(entretien.getIdVehicule());
-        entretienExistant.setDateEntreeEntr(entretien.getDateEntreeEntr());
-        entretienExistant.setDateSortieEntr(entretien.getDateSortieEntr());
-        entretienExistant.setMotifEntr(entretien.getMotifEntr());
-        entretienExistant.setObservation(entretien.getObservation());
-        entretienExistant.setCoutEntr(entretien.getCoutEntr());
-        entretienExistant.setLieuEntr(entretien.getLieuEntr());
-        entretienExistant.setType(entretien.getType());
-        // Ne pas modifier le statutOt ici directement, utiliser changerStatutOrdreTravailEntretien
+        validerDonneesEntretien(entretien);
 
-        // Si l'entretien est marqué comme sorti et était "En entretien", remettre le véhicule "Disponible"
-        if (entretienExistant.getDateSortieEntr() != null && entretienExistant.getStatutOt() == StatutOrdreTravail.CLOTURE) {
-            Vehicule vehicule = persistenceService.trouverVehiculeParId(entretienExistant.getIdVehicule());
-            if (vehicule != null) {
-                EtatVoiture etatActuel = persistenceService.trouverEtatVoitureParId(vehicule.getIdEtatVoiture());
-                if (etatActuel != null && "En entretien".equalsIgnoreCase(etatActuel.getLibEtatVoiture())) {
-                    EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
-                    if (etatDisponible != null) {
-                        changerEtatVehicule(vehicule.getIdVehicule(), etatDisponible.getIdEtatVoiture(), entretienExistant.getDateSortieEntr());
-                    }
-                }
-            }
-        }
-        return persistenceService.sauvegarderEntretien(entretienExistant);
-    }
+        Entretien entretienModifie = persistenceService.sauvegarderEntretien(entretien);
 
-    public void supprimerEntretien(int idEntretien) {
-        if (idEntretien == 0) throw new ErreurValidation("ID entretien requis.");
-        Entretien entretien = persistenceService.trouverEntretienParId(idEntretien);
-        if (entretien == null) throw new ErreurLogiqueMetier("Entretien ID " + idEntretien + " introuvable.");
-        if (entretien.getStatutOt() != StatutOrdreTravail.OUVERT) {
-            throw new ErreurLogiqueMetier("Seul un entretien 'Ouvert' peut être supprimé. Statut: " + entretien.getStatutOt().getDbValue());
-        }
-        persistenceService.supprimerEntretienParId(idEntretien);
-        LOGGER_METIER.info("Entretien ID " + idEntretien + " supprimé.");
-    }
-
-    public void changerStatutOrdreTravailEntretien(int idEntretien, StatutOrdreTravail nouveauStatut) {
-        if (idEntretien == 0) throw new ErreurValidation("ID entretien requis.");
-        Objects.requireNonNull(nouveauStatut, "Le nouveau statut OT ne peut être nul.");
-        Entretien entretien = persistenceService.trouverEntretienParId(idEntretien);
-        if (entretien == null) throw new ErreurLogiqueMetier("Entretien ID " + idEntretien + " introuvable.");
-        if (entretien.getStatutOt() == StatutOrdreTravail.CLOTURE) {
-            throw new ErreurLogiqueMetier("Un OT clôturé ne peut changer de statut.");
-        }
-        if (entretien.getStatutOt() == nouveauStatut) return; // Pas de changement
-
-        entretien.setStatutOt(nouveauStatut);
-        if (nouveauStatut == StatutOrdreTravail.CLOTURE && entretien.getDateSortieEntr() == null) {
-            entretien.setDateSortieEntr(LocalDateTime.now()); // Date de sortie par défaut si clôture
-        }
-
-        // Logique de mise à jour de l'état du véhicule
-        Vehicule vehicule = persistenceService.trouverVehiculeParId(entretien.getIdVehicule());
-        if (vehicule != null) {
-            if (nouveauStatut == StatutOrdreTravail.CLOTURE) {
+        if (entretienModifie.getDateSortieEntr() != null && entretienModifie.getStatutOt() == StatutOrdreTravail.CLOTURE) {
+            Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(entretienModifie.getIdVehicule());
+            if (vehiculeConcerne != null) {
                 EtatVoiture etatDisponible = persistenceService.trouverEtatVoitureParLibelle("Disponible");
                 if (etatDisponible != null) {
-                    changerEtatVehicule(vehicule.getIdVehicule(), etatDisponible.getIdEtatVoiture(), Objects.requireNonNullElse(entretien.getDateSortieEntr(), LocalDateTime.now()));
+                    changerEtatVehicule(vehiculeConcerne.getIdVehicule(), etatDisponible.getIdEtatVoiture(), entretienModifie.getDateSortieEntr());
                 }
-            } else if (nouveauStatut == StatutOrdreTravail.EN_COURS || nouveauStatut == StatutOrdreTravail.OUVERT) {
-                // S'assurer que le véhicule est marqué "En entretien" ou "Panne"
-                EtatVoiture etatActuelVehicule = persistenceService.trouverEtatVoitureParId(vehicule.getIdEtatVoiture());
-                if (etatActuelVehicule != null && !"En entretien".equalsIgnoreCase(etatActuelVehicule.getLibEtatVoiture()) && !"Panne".equalsIgnoreCase(etatActuelVehicule.getLibEtatVoiture())) {
-                    EtatVoiture etatEnEntretien = persistenceService.trouverEtatVoitureParLibelle("En entretien");
-                    if (etatEnEntretien != null) {
-                        changerEtatVehicule(vehicule.getIdVehicule(), etatEnEntretien.getIdEtatVoiture(), entretien.getDateEntreeEntr());
-                    }
+            }
+        } else if (entretienModifie.getDateSortieEntr() == null && entretienModifie.getStatutOt() != StatutOrdreTravail.CLOTURE) {
+            Vehicule vehiculeConcerne = persistenceService.trouverVehiculeParId(entretienModifie.getIdVehicule());
+            if (vehiculeConcerne != null) {
+                EtatVoiture etatEnEntretien = persistenceService.trouverEtatVoitureParLibelle("En entretien");
+                if (etatEnEntretien != null) {
+                    changerEtatVehicule(vehiculeConcerne.getIdVehicule(), etatEnEntretien.getIdEtatVoiture(), entretienModifie.getDateEntreeEntr());
                 }
             }
         }
-        persistenceService.sauvegarderEntretien(entretien);
-        LOGGER_METIER.info("Statut OT de l'entretien ID " + idEntretien + " changé à " + nouveauStatut.getDbValue());
+        return entretienModifie;
     }
 
-    public List<Entretien> rechercherEntretiensFiltres(LocalDateTime dateDebutPeriode, LocalDateTime dateFinPeriode, TypeEntretien typeFiltre, StatutOrdreTravail statutOTFiltre, String rechercheVehiculeImmat) {
-        List<Entretien> tousLesEntretiens = persistenceService.trouverTousLesEntretiens();
-        return tousLesEntretiens.stream()
-                .filter(e -> dateDebutPeriode == null || !e.getDateEntreeEntr().isBefore(dateDebutPeriode))
-                .filter(e -> dateFinPeriode == null || (e.getDateSortieEntr() != null && !e.getDateSortieEntr().isAfter(dateFinPeriode)) || (e.getDateSortieEntr() == null && !e.getDateEntreeEntr().isAfter(dateFinPeriode)))
-                .filter(e -> typeFiltre == null || e.getType() == typeFiltre)
-                .filter(e -> statutOTFiltre == null || e.getStatutOt() == statutOTFiltre)
-                .filter(e -> {
-                    if (rechercheVehiculeImmat == null || rechercheVehiculeImmat.trim().isEmpty()) return true;
-                    Vehicule v = persistenceService.trouverVehiculeParId(e.getIdVehicule());
-                    return v != null && v.getImmatriculation().toLowerCase().contains(rechercheVehiculeImmat.toLowerCase());
-                })
-                .collect(Collectors.toList());
+    public Entretien changerStatutOrdreTravail(int idEntretien, StatutOrdreTravail nouveauStatut) throws ErreurLogiqueMetier, ErreurBaseDeDonnees, ErreurValidation {
+        Entretien entretien = persistenceService.trouverEntretienParId(idEntretien);
+        if (entretien == null) {
+            throw new ErreurLogiqueMetier("Entretien ID " + idEntretien + " non trouvé.");
+        }
+        entretien.setStatutOt(nouveauStatut);
+        if (nouveauStatut == StatutOrdreTravail.CLOTURE && entretien.getDateSortieEntr() == null) {
+            entretien.setDateSortieEntr(LocalDateTime.now());
+        }
+        return modifierEntretien(entretien);
     }
 
 
-    public SocietaireCompte creerNouveauCompteSocietaire(SocietaireCompte compte) {
+    private void validerDonneesEntretien(Entretien entretien) throws ErreurValidation {
+        if (entretien.getIdVehicule() == 0) {
+            throw new ErreurValidation("Un véhicule doit être associé à l'entretien.");
+        }
+        if (entretien.getDateEntreeEntr() == null) {
+            throw new ErreurValidation("La date d'entrée pour l'entretien est obligatoire.");
+        }
+        if (entretien.getDateSortieEntr() != null && entretien.getDateSortieEntr().isBefore(entretien.getDateEntreeEntr())) {
+            throw new ErreurValidation("La date de sortie de l'entretien ne peut être antérieure à la date d'entrée.");
+        }
+        if (entretien.getMotifEntr() == null || entretien.getMotifEntr().trim().isEmpty()) {
+            throw new ErreurValidation("Le motif de l'entretien est obligatoire.");
+        }
+        if (entretien.getType() == null) {
+            throw new ErreurValidation("Le type d'entretien (Préventif/Correctif) est obligatoire.");
+        }
+        if (entretien.getCoutEntr() != null && entretien.getCoutEntr().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ErreurValidation("Le coût de l'entretien ne peut être négatif.");
+        }
+    }
+
+    public SocietaireCompte creerNouveauCompteSocietaire(SocietaireCompte compte) throws ErreurValidation, ErreurBaseDeDonnees {
         Objects.requireNonNull(compte, "L'objet SocietaireCompte ne peut être nul.");
-        if (compte.getNom() == null || compte.getNom().trim().isEmpty()) throw new ErreurValidation("Le nom du sociétaire est requis.");
-        if (compte.getNumero() == null || compte.getNumero().trim().isEmpty()) throw new ErreurValidation("Le numéro de compte est requis.");
-        if (persistenceService.trouverSocietaireCompteParNumero(compte.getNumero()) != null) { // Méthode à créer dans PersistenceService
+        validerDonneesCompteSocietaire(compte);
+        if (persistenceService.trouverSocietaireCompteParNumero(compte.getNumero()) != null) {
             throw new ErreurValidation("Un compte sociétaire avec le numéro '" + compte.getNumero() + "' existe déjà.");
         }
-        if (compte.getSolde() == null) compte.setSolde(BigDecimal.ZERO);
+        if (compte.getSolde() == null) {
+            compte.setSolde(BigDecimal.ZERO);
+        }
         return persistenceService.sauvegarderSocietaireCompte(compte);
     }
 
-    public SocietaireCompte modifierCompteSocietaire(SocietaireCompte compte) {
-        Objects.requireNonNull(compte, "L'objet SocietaireCompte ne peut être nul pour la modification.");
-        if (compte.getIdSocietaire() == 0) throw new ErreurValidation("L'ID du compte sociétaire est requis.");
-        SocietaireCompte compteExistant = persistenceService.trouverSocietaireCompteParId(compte.getIdSocietaire());
-        if (compteExistant == null) throw new ErreurLogiqueMetier("Compte sociétaire ID " + compte.getIdSocietaire() + " introuvable.");
-
-        if (compte.getNumero() != null && !compteExistant.getNumero().equals(compte.getNumero())) {
-            SocietaireCompte autreCompteAvecNumero = persistenceService.trouverSocietaireCompteParNumero(compte.getNumero());
-            if (autreCompteAvecNumero != null && autreCompteAvecNumero.getIdSocietaire() != compte.getIdSocietaire()) {
-                throw new ErreurValidation("Un autre compte sociétaire utilise déjà le numéro '" + compte.getNumero() + "'.");
-            }
+    public SocietaireCompte modifierCompteSocietaire(SocietaireCompte compte) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Objects.requireNonNull(compte, "L'objet SocietaireCompte ne peut être nul.");
+        if (compte.getIdSocietaire() == 0) {
+            throw new ErreurValidation("L'ID du compte sociétaire est requis pour la modification.");
         }
-        // Le solde n'est pas modifié directement ici mais par des mouvements.
-        compteExistant.setNom(compte.getNom());
-        compteExistant.setNumero(compte.getNumero());
-        compteExistant.setEmail(compte.getEmail());
-        compteExistant.setTelephone(compte.getTelephone());
-        compteExistant.setIdPersonnel(compte.getIdPersonnel());
-        return persistenceService.sauvegarderSocietaireCompte(compteExistant);
+        SocietaireCompte compteExistant = persistenceService.trouverSocietaireCompteParId(compte.getIdSocietaire());
+        if (compteExistant == null) {
+            throw new ErreurLogiqueMetier("Compte sociétaire ID " + compte.getIdSocietaire() + " non trouvé.");
+        }
+        validerDonneesCompteSocietaire(compte);
+        SocietaireCompte compteAvecNumero = persistenceService.trouverSocietaireCompteParNumero(compte.getNumero());
+        if (compteAvecNumero != null && compteAvecNumero.getIdSocietaire() != compte.getIdSocietaire()) {
+            throw new ErreurValidation("Un autre compte sociétaire avec le numéro '" + compte.getNumero() + "' existe déjà.");
+        }
+        compte.setSolde(compteExistant.getSolde());
+        return persistenceService.sauvegarderSocietaireCompte(compte);
     }
 
-    public List<SocietaireCompte> rechercherComptesSocietaires(String rechercheNomOuNumero) {
-        List<SocietaireCompte> tousLesComptes = persistenceService.trouverTousLesSocietairesComptes();
-        if (rechercheNomOuNumero == null || rechercheNomOuNumero.trim().isEmpty()) return tousLesComptes;
-        String rechercheLower = rechercheNomOuNumero.toLowerCase();
-        return tousLesComptes.stream()
-                .filter(c -> c.getNom().toLowerCase().contains(rechercheLower) || c.getNumero().toLowerCase().contains(rechercheLower))
-                .collect(Collectors.toList());
+    private void validerDonneesCompteSocietaire(SocietaireCompte compte) throws ErreurValidation {
+        if (compte.getNom() == null || compte.getNom().trim().isEmpty()) {
+            throw new ErreurValidation("Le nom du sociétaire est obligatoire.");
+        }
+        if (compte.getNumero() == null || compte.getNumero().trim().isEmpty()) {
+            throw new ErreurValidation("Le numéro de compte est obligatoire.");
+        }
+        if (compte.getEmail() != null && !compte.getEmail().trim().isEmpty() && !compte.getEmail().matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
+            throw new ErreurValidation("Format d'email invalide.");
+        }
     }
 
-
-    public SocietaireCompte effectuerDepotSurCompteSocietaire(int idSocietaire, BigDecimal montant) {
-        if (idSocietaire == 0) throw new ErreurValidation("ID sociétaire requis.");
-        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) throw new ErreurValidation("Montant de dépôt doit être positif.");
+    public SocietaireCompte effectuerDepotSurCompteSocietaire(int idSocietaire, BigDecimal montant) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ErreurValidation("Le montant du dépôt doit être positif.");
+        }
         SocietaireCompte compte = persistenceService.trouverSocietaireCompteParId(idSocietaire);
-        if (compte == null) throw new ErreurLogiqueMetier("Compte sociétaire ID " + idSocietaire + " introuvable.");
-
+        if (compte == null) {
+            throw new ErreurLogiqueMetier("Compte sociétaire ID " + idSocietaire + " non trouvé.");
+        }
         compte.setSolde(compte.getSolde().add(montant));
         persistenceService.sauvegarderSocietaireCompte(compte);
 
-        Mouvement mvt = new Mouvement(0, idSocietaire, LocalDateTime.now(), TypeMouvement.DEPOT, montant);
-        persistenceService.sauvegarderMouvement(mvt);
-        LOGGER_METIER.info("Dépôt de " + montant + " effectué sur compte ID " + idSocietaire);
+        Mouvement mouvement = new Mouvement(0, idSocietaire, LocalDateTime.now(), TypeMouvement.DEPOT, montant);
+        persistenceService.sauvegarderMouvement(mouvement);
         return compte;
     }
 
-    public SocietaireCompte effectuerRetraitDeCompteSocietaire(int idSocietaire, BigDecimal montant) {
-        if (idSocietaire == 0) throw new ErreurValidation("ID sociétaire requis.");
-        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) throw new ErreurValidation("Montant de retrait doit être positif.");
-        SocietaireCompte compte = persistenceService.trouverSocietaireCompteParId(idSocietaire);
-        if (compte == null) throw new ErreurLogiqueMetier("Compte sociétaire ID " + idSocietaire + " introuvable.");
-        if (compte.getSolde().compareTo(montant) < 0) {
-            throw new ErreurLogiqueMetier("Solde insuffisant sur le compte ID " + idSocietaire + " (Solde: " + compte.getSolde() + ", Retrait: " + montant + ").");
+    public SocietaireCompte effectuerRetraitDeCompteSocietaire(int idSocietaire, BigDecimal montant) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ErreurValidation("Le montant du retrait doit être positif.");
         }
-
+        SocietaireCompte compte = persistenceService.trouverSocietaireCompteParId(idSocietaire);
+        if (compte == null) {
+            throw new ErreurLogiqueMetier("Compte sociétaire ID " + idSocietaire + " non trouvé.");
+        }
+        if (compte.getSolde().compareTo(montant) < 0) {
+            throw new ErreurLogiqueMetier("Solde insuffisant pour effectuer le retrait. Solde actuel: " + compte.getSolde());
+        }
         compte.setSolde(compte.getSolde().subtract(montant));
         persistenceService.sauvegarderSocietaireCompte(compte);
 
-        Mouvement mvt = new Mouvement(0, idSocietaire, LocalDateTime.now(), TypeMouvement.RETRAIT, montant);
-        persistenceService.sauvegarderMouvement(mvt);
-        LOGGER_METIER.info("Retrait de " + montant + " effectué sur compte ID " + idSocietaire);
+        Mouvement mouvement = new Mouvement(0, idSocietaire, LocalDateTime.now(), TypeMouvement.RETRAIT, montant);
+        persistenceService.sauvegarderMouvement(mouvement);
         return compte;
     }
 
-    public DocumentSocietaire enregistrerNouveauDocumentSocietaire(int idSocietaire, TypeDocumentSocietaire typeDoc, File fichierSource) throws IOException {
-        Objects.requireNonNull(fichierSource, "Le fichier source ne peut être nul.");
-        if (!fichierSource.exists() || !fichierSource.isFile()) throw new ErreurValidation("Le fichier source n'existe pas ou n'est pas un fichier valide.");
-        if (idSocietaire == 0) throw new ErreurValidation("ID sociétaire requis pour l'upload.");
-        Objects.requireNonNull(typeDoc, "Le type de document est requis.");
+    public DocumentSocietaire televerserDocumentSocietaire(int idSocietaire, TypeDocumentSocietaire typeDoc, Path cheminFichierSource, String nomFichierOriginal) throws ErreurValidation, ErreurLogiqueMetier, IOException {
+        SocietaireCompte compte = persistenceService.trouverSocietaireCompteParId(idSocietaire);
+        if (compte == null) {
+            throw new ErreurLogiqueMetier("Compte sociétaire ID " + idSocietaire + " non trouvé pour l'upload du document.");
+        }
+        if (typeDoc == null) {
+            throw new ErreurValidation("Le type de document est obligatoire.");
+        }
+        if (cheminFichierSource == null || !Files.exists(cheminFichierSource)) {
+            throw new ErreurValidation("Le fichier source est invalide ou n'existe pas.");
+        }
+        if (nomFichierOriginal == null || nomFichierOriginal.trim().isEmpty()) {
+            throw new ErreurValidation("Le nom original du fichier est requis.");
+        }
 
-        SocietaireCompte sc = persistenceService.trouverSocietaireCompteParId(idSocietaire);
-        if (sc == null) throw new ErreurLogiqueMetier("Sociétaire ID " + idSocietaire + " introuvable.");
+        Path dossierSocietaire = Paths.get(DOSSIER_BASE_DOCUMENTS, "societaire_" + idSocietaire);
+        Files.createDirectories(dossierSocietaire);
 
-        Path dossierStockage = Paths.get(DOSSIER_STOCKAGE_DOCUMENTS, String.valueOf(idSocietaire));
-        Files.createDirectories(dossierStockage); // Crée si n'existe pas
-
-        String nomFichierOriginal = fichierSource.getName();
         String extension = "";
         int i = nomFichierOriginal.lastIndexOf('.');
-        if (i > 0) extension = nomFichierOriginal.substring(i);
-        String nomFichierStocke = UUID.randomUUID().toString() + extension; // Nom unique pour éviter collisions
-        Path cheminDestination = dossierStockage.resolve(nomFichierStocke);
+        if (i > 0) {
+            extension = nomFichierOriginal.substring(i);
+        }
+        String nomFichierStocke = typeDoc.getDbValue() + "_" + System.currentTimeMillis() + extension;
+        Path cheminFichierDestination = dossierSocietaire.resolve(nomFichierStocke);
 
-        Files.copy(fichierSource.toPath(), cheminDestination, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(cheminFichierSource, cheminFichierDestination, StandardCopyOption.REPLACE_EXISTING);
 
-        DocumentSocietaire doc = new DocumentSocietaire();
-        doc.setIdSocietaire(idSocietaire);
-        doc.setTypeDoc(typeDoc);
-        doc.setCheminFichier(cheminDestination.toString()); // Stocker le chemin complet
-        doc.setDateUpload(LocalDateTime.now());
+        DocumentSocietaire document = new DocumentSocietaire();
+        document.setIdSocietaire(idSocietaire);
+        document.setTypeDoc(typeDoc);
+        document.setCheminFichier(cheminFichierDestination.toString());
+        document.setDateUpload(LocalDateTime.now());
 
-        DocumentSocietaire docSauvegarde = persistenceService.sauvegarderDocumentSocietaire(doc);
-        LOGGER_METIER.info("Document '" + nomFichierOriginal + "' uploadé et enregistré pour sociétaire ID " + idSocietaire + " sous '" + cheminDestination + "'.");
-        return docSauvegarde;
+        return persistenceService.sauvegarderDocumentSocietaire(document);
     }
 
-    public void supprimerDocumentSocietaire(int idDoc, String cheminFichierComplet) throws IOException {
-        if (idDoc == 0) throw new ErreurValidation("ID document requis.");
-        DocumentSocietaire docASupprimer = persistenceService.trouverDocumentSocietaireParId(idDoc);
-        if (docASupprimer == null) throw new ErreurLogiqueMetier("Document ID " + idDoc + " introuvable.");
-
-        Path cheminFichier = Paths.get(cheminFichierComplet); // Utiliser le chemin stocké
-        if (Files.exists(cheminFichier)) {
-            Files.delete(cheminFichier);
-            LOGGER_METIER.info("Fichier physique supprimé : " + cheminFichier);
+    public void supprimerDocumentSocietaire(int idDoc, String cheminFichierStocke) throws ErreurLogiqueMetier, IOException {
+        DocumentSocietaire doc = persistenceService.trouverDocumentSocietaireParId(idDoc);
+        if (doc == null) {
+            throw new ErreurLogiqueMetier("Document ID " + idDoc + " non trouvé.");
+        }
+        if (!Objects.equals(cheminFichierStocke, doc.getCheminFichier())) {
+            BUSINESS_LOGGER.warning("Tentative de suppression de document ID " + idDoc + " avec un chemin de fichier (" + cheminFichierStocke + ") qui ne correspond pas à celui en BDD (" + doc.getCheminFichier() + "). Suppression du fichier physique annulée.");
         } else {
-            LOGGER_METIER.warning("Fichier physique non trouvé lors de la tentative de suppression : " + cheminFichier);
+            Path cheminFichier = Paths.get(cheminFichierStocke);
+            if (Files.exists(cheminFichier)) {
+                Files.delete(cheminFichier);
+                BUSINESS_LOGGER.info("Fichier " + cheminFichierStocke + " supprimé du disque.");
+            } else {
+                BUSINESS_LOGGER.warning("Fichier " + cheminFichierStocke + " non trouvé sur le disque pour suppression.");
+            }
         }
         persistenceService.supprimerDocumentSocietaireParId(idDoc);
-        LOGGER_METIER.info("Entrée document ID " + idDoc + " supprimée de la base de données.");
+        BUSINESS_LOGGER.info("Document ID " + idDoc + " supprimé de la base de données.");
     }
 
-    public List<DocumentSocietaire> rechercherDocumentsSocietaires(Integer idSocietaireFiltre, TypeDocumentSocietaire typeDocFiltre) {
-        if (idSocietaireFiltre != null && typeDocFiltre != null) {
-            return persistenceService.trouverDocumentsParSocietaireEtType(idSocietaireFiltre, typeDocFiltre);
-        } else if (idSocietaireFiltre != null) {
-            return persistenceService.trouverDocumentsParSocietaireId(idSocietaireFiltre);
-        } else if (typeDocFiltre != null) {
-            return persistenceService.trouverDocumentsParType(typeDocFiltre);
+
+    public Utilisateur creerNouvelUtilisateur(Utilisateur utilisateur, String motDePasseClair) throws ErreurValidation, ErreurBaseDeDonnees {
+        Objects.requireNonNull(utilisateur, "L'objet Utilisateur ne peut être nul.");
+        Objects.requireNonNull(motDePasseClair, "Le mot de passe ne peut être nul pour un nouvel utilisateur.");
+        if (motDePasseClair.trim().isEmpty()) {
+            throw new ErreurValidation("Le mot de passe ne peut être vide.");
+        }
+        validerDonneesUtilisateur(utilisateur);
+        if (persistenceService.trouverUtilisateurParLogin(utilisateur.getLogin()) != null) {
+            throw new ErreurValidation("Un utilisateur avec le login '" + utilisateur.getLogin() + "' existe déjà.");
+        }
+        if (utilisateur.getIdPersonnel() != null && persistenceService.trouverPersonnelParId(utilisateur.getIdPersonnel()) == null) {
+            throw new ErreurValidation("Le personnel associé (ID: " + utilisateur.getIdPersonnel() + ") n'existe pas.");
+        }
+
+        utilisateur.setHashMdp(securityManager.genererHashMotDePasse(motDePasseClair));
+        return persistenceService.sauvegarderUtilisateur(utilisateur);
+    }
+
+    public Utilisateur modifierUtilisateur(Utilisateur utilisateur, String nouveauMotDePasseClairOptionnel) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Objects.requireNonNull(utilisateur, "L'objet Utilisateur ne peut être nul.");
+        if (utilisateur.getId() == 0) {
+            throw new ErreurValidation("L'ID de l'utilisateur est requis pour la modification.");
+        }
+        Utilisateur utilisateurExistant = persistenceService.trouverUtilisateurParId(utilisateur.getId());
+        if (utilisateurExistant == null) {
+            throw new ErreurLogiqueMetier("Utilisateur ID " + utilisateur.getId() + " non trouvé.");
+        }
+        utilisateur.setLogin(utilisateurExistant.getLogin());
+        validerDonneesUtilisateur(utilisateur);
+
+        if (utilisateur.getIdPersonnel() != null && persistenceService.trouverPersonnelParId(utilisateur.getIdPersonnel()) == null) {
+            throw new ErreurValidation("Le personnel associé (ID: " + utilisateur.getIdPersonnel() + ") n'existe pas.");
+        }
+
+        if (nouveauMotDePasseClairOptionnel != null && !nouveauMotDePasseClairOptionnel.trim().isEmpty()) {
+            utilisateur.setHashMdp(securityManager.genererHashMotDePasse(nouveauMotDePasseClairOptionnel));
+        } else {
+            utilisateur.setHashMdp(utilisateurExistant.getHashMdp());
+        }
+        return persistenceService.sauvegarderUtilisateur(utilisateur);
+    }
+
+    public void reinitialiserMotDePasseUtilisateur(int idUtilisateur, String nouveauMotDePasseClair) throws ErreurValidation, ErreurLogiqueMetier, ErreurBaseDeDonnees {
+        Utilisateur utilisateur = persistenceService.trouverUtilisateurParId(idUtilisateur);
+        if (utilisateur == null) {
+            throw new ErreurLogiqueMetier("Utilisateur ID " + idUtilisateur + " non trouvé pour réinitialisation du mot de passe.");
+        }
+        if (nouveauMotDePasseClair == null || nouveauMotDePasseClair.trim().isEmpty()) {
+            throw new ErreurValidation("Le nouveau mot de passe ne peut pas être vide.");
+        }
+        utilisateur.setHashMdp(securityManager.genererHashMotDePasse(nouveauMotDePasseClair));
+        persistenceService.sauvegarderUtilisateur(utilisateur);
+        BUSINESS_LOGGER.info("Mot de passe réinitialisé pour l'utilisateur ID " + idUtilisateur);
+    }
+
+
+    private void validerDonneesUtilisateur(Utilisateur utilisateur) throws ErreurValidation {
+        if (utilisateur.getLogin() == null || utilisateur.getLogin().trim().isEmpty()) {
+            throw new ErreurValidation("Le login de l'utilisateur est obligatoire.");
+        }
+        if (utilisateur.getRole() == null) {
+            throw new ErreurValidation("Le rôle de l'utilisateur est obligatoire.");
+        }
+    }
+
+    public List<Vehicule> rechercherVehiculesFiltres(String immatriculation, String etatLibelle, EnergieVehicule energie) {
+        return persistenceService.rechercherVehiculesFiltres(immatriculation, etatLibelle, energie);
+    }
+
+    public List<Mission> rechercherMissionsFiltrees(LocalDateTime dateDebut, LocalDateTime dateFin, StatutMission statut, String rechercheVehiculeImmat) {
+        return persistenceService.rechercherMissionsFiltrees(dateDebut, dateFin, statut, rechercheVehiculeImmat);
+    }
+
+    public List<Entretien> rechercherEntretiensFiltres(LocalDateTime dateDebut, LocalDateTime dateFin, TypeEntretien type, StatutOrdreTravail statutOT, String rechercheVehiculeImmat) {
+        return persistenceService.rechercherEntretiensFiltres(dateDebut, dateFin, type, statutOT, rechercheVehiculeImmat);
+    }
+
+    public List<SocietaireCompte> rechercherComptesSocietaires(String rechercheNomOuNumero) {
+        return persistenceService.rechercherComptesSocietaires(rechercheNomOuNumero);
+    }
+
+    public List<DocumentSocietaire> rechercherDocumentsSocietaires(Integer idSocietaire, TypeDocumentSocietaire typeDoc) {
+        if (idSocietaire != null && typeDoc != null) {
+            return persistenceService.trouverDocumentsParSocietaireEtType(idSocietaire, typeDoc);
+        } else if (idSocietaire != null) {
+            return persistenceService.trouverDocumentsParSocietaireId(idSocietaire);
+        } else if (typeDoc != null) {
+            return persistenceService.trouverDocumentsParType(typeDoc);
         } else {
             return persistenceService.trouverTousLesDocumentsSocietaires();
         }
     }
 
-    public Utilisateur creerNouvelUtilisateur(Utilisateur utilisateur, String motDePasseEnClair) {
-        Objects.requireNonNull(utilisateur, "L'objet Utilisateur ne peut être nul.");
-        Objects.requireNonNull(motDePasseEnClair, "Le mot de passe en clair est requis.");
-        if (utilisateur.getLogin() == null || utilisateur.getLogin().trim().isEmpty()) throw new ErreurValidation("Login requis.");
-        if (persistenceService.trouverUtilisateurParLogin(utilisateur.getLogin()) != null) {
-            throw new ErreurValidation("Login '" + utilisateur.getLogin() + "' déjà utilisé.");
+    public List<Utilisateur> rechercherUtilisateursFiltres(String login, RoleUtilisateur role) {
+        if (login != null && !login.trim().isEmpty() && role != null) {
+            Utilisateur u = persistenceService.trouverUtilisateurParLogin(login);
+            if (u != null && u.getRole() == role) return List.of(u);
+            return List.of();
+        } else if (login != null && !login.trim().isEmpty()) {
+            Utilisateur u = persistenceService.trouverUtilisateurParLogin(login);
+            return u != null ? List.of(u) : List.of();
+        } else if (role != null) {
+            return persistenceService.trouverUtilisateursParRole(role); // Appel à la méthode maintenant existante
+        } else {
+            return persistenceService.trouverTousLesUtilisateurs();
         }
-        if (utilisateur.getRole() == null) throw new ErreurValidation("Rôle requis.");
-        if (motDePasseEnClair.trim().isEmpty()) throw new ErreurValidation("Mot de passe ne peut être vide.");
-
-        SecurityManager sm = new SecurityManager(this.persistenceService); // Instanciation locale pour hachage
-        utilisateur.setHashMdp(sm.genererHashMotDePasse(motDePasseEnClair));
-        // MFA Secret peut être généré ici si besoin, ou laissé null
-
-        return persistenceService.sauvegarderUtilisateur(utilisateur);
     }
-
-    public Utilisateur modifierUtilisateur(Utilisateur utilisateur) { // Pour rôle, personnel
-        Objects.requireNonNull(utilisateur, "L'objet Utilisateur ne peut être nul pour la modification.");
-        if (utilisateur.getId() == 0) throw new ErreurValidation("ID utilisateur requis.");
-        Utilisateur utilisateurExistant = persistenceService.trouverUtilisateurParId(utilisateur.getId());
-        if (utilisateurExistant == null) throw new ErreurLogiqueMetier("Utilisateur ID " + utilisateur.getId() + " introuvable.");
-
-        // Le login et le hashMdp ne sont pas modifiés par cette méthode.
-        // Seuls rôle et idPersonnel.
-        utilisateurExistant.setRole(utilisateur.getRole());
-        utilisateurExistant.setIdPersonnel(utilisateur.getIdPersonnel());
-        // Gérer mfaSecret si applicable
-
-        return persistenceService.sauvegarderUtilisateur(utilisateurExistant);
-    }
-
-    public Utilisateur modifierMotDePasseUtilisateur(int idUtilisateur, String nouveauMotDePasseEnClair) {
-        if (idUtilisateur == 0) throw new ErreurValidation("ID utilisateur requis.");
-        Objects.requireNonNull(nouveauMotDePasseEnClair, "Nouveau mot de passe requis.");
-        if (nouveauMotDePasseEnClair.trim().isEmpty()) throw new ErreurValidation("Mot de passe ne peut être vide.");
-
-        Utilisateur utilisateur = persistenceService.trouverUtilisateurParId(idUtilisateur);
-        if (utilisateur == null) throw new ErreurLogiqueMetier("Utilisateur ID " + idUtilisateur + " introuvable.");
-
-        SecurityManager sm = new SecurityManager(this.persistenceService);
-        utilisateur.setHashMdp(sm.genererHashMotDePasse(nouveauMotDePasseEnClair));
-        return persistenceService.sauvegarderUtilisateur(utilisateur);
-    }
-
-    public void supprimerUtilisateur(int idUtilisateur) {
-        if (idUtilisateur == 0) throw new ErreurValidation("ID utilisateur requis.");
-        Utilisateur utilisateur = persistenceService.trouverUtilisateurParId(idUtilisateur);
-        if (utilisateur == null) throw new ErreurLogiqueMetier("Utilisateur ID " + idUtilisateur + " introuvable.");
-        // Ajouter des vérifications si l'utilisateur est lié à des entités critiques non supprimables par cascade.
-        // Par exemple, ne pas supprimer un utilisateur s'il est le seul admin (U4).
-        if (utilisateur.getRole() == RoleUtilisateur.U4) {
-            List<Utilisateur> admins = persistenceService.trouverUtilisateursParRole(RoleUtilisateur.U4); // Méthode à créer
-            if (admins.size() <= 1 && admins.get(0).getId() == idUtilisateur) {
-                throw new ErreurLogiqueMetier("Impossible de supprimer le seul administrateur système.");
-            }
-        }
-        persistenceService.supprimerUtilisateurParId(idUtilisateur);
-        LOGGER_METIER.info("Utilisateur ID " + idUtilisateur + " (" + utilisateur.getLogin() + ") supprimé.");
-    }
-
-    public List<Utilisateur> rechercherUtilisateurs(String loginPartiel, RoleUtilisateur roleFiltre) {
-        List<Utilisateur> tousLesUtilisateurs = persistenceService.trouverTousLesUtilisateurs();
-        return tousLesUtilisateurs.stream()
-                .filter(u -> loginPartiel == null || u.getLogin().toLowerCase().contains(loginPartiel.toLowerCase()))
-                .filter(u -> roleFiltre == null || u.getRole() == roleFiltre)
-                .collect(Collectors.toList());
-    }
-
-    // Logique pour les paramètres (simplifiée, car pas de stockage persistant défini pour les paramètres eux-mêmes)
-    public boolean obtenirParametreBooleen(String cleParametre, boolean valeurParDefaut) {
-        // Simuler la lecture
-        LOGGER_METIER.info("Lecture (fictive) du paramètre booléen : " + cleParametre);
-        return valeurParDefaut;
-    }
-    public int obtenirParametreEntier(String cleParametre, int valeurParDefaut) {
-        LOGGER_METIER.info("Lecture (fictive) du paramètre entier : " + cleParametre);
-        return valeurParDefaut;
-    }
-    public void sauvegarderParametre(String cleParametre, boolean valeur) {
-        LOGGER_METIER.info("Sauvegarde (fictive) du paramètre : " + cleParametre + " = " + valeur);
-    }
-    public void sauvegarderParametre(String cleParametre, int valeur) {
-        LOGGER_METIER.info("Sauvegarde (fictive) du paramètre : " + cleParametre + " = " + valeur);
-    }
-
 }
