@@ -6,33 +6,37 @@
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.SeparatorMenuItem?>
-<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
-<?import javafx.scene.text.Font?>
-
 <?import javafx.scene.layout.VBox?>
-<BorderPane fx:id="conteneurPrincipalApplication" prefHeight="768.0" prefWidth="1366.0" stylesheets="@../css/theme-default.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
+
+<BorderPane fx:id="conteneurPrincipalApplication" prefHeight="800.0" prefWidth="1400.0" stylesheets="@../css/styles-all.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
     <top>
         <VBox>
-            <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="header-bar-principale" prefHeight="55.0">
+            <HBox alignment="CENTER_LEFT" spacing="15.0" styleClass="header-bar-principale" prefHeight="60.0">
                 <padding>
-                    <Insets left="15.0" right="15.0" />
+                    <Insets left="20.0" right="20.0" />
                 </padding>
-                <ImageView fitHeight="35.0" fitWidth="35.0" pickOnBounds="true" preserveRatio="true">
-                    <!-- <image><Image url="@../images/logo_app_header.png" /></image> -->
+                <ImageView fitHeight="40.0" fitWidth="40.0" pickOnBounds="true" preserveRatio="true">
+                    <image><Image url="@../images/logo-parcauto.png" /></image>
                 </ImageView>
                 <Label text="ParcAuto MIAGE Holding" styleClass="titre-application-header" />
                 <Region HBox.hgrow="ALWAYS" />
-                <Label fx:id="etiquetteUtilisateurConnecte" styleClass="info-utilisateur-header" />
-                <Label fx:id="etiquetteRoleUtilisateur" styleClass="info-utilisateur-header" />
+                <Label fx:id="etiquetteUtilisateurConnecte" styleClass="info-utilisateur-header" text="Utilisateur: Non connecté" />
+                <Label fx:id="etiquetteRoleUtilisateur" styleClass="info-utilisateur-header" text="Rôle: N/A">
+                    <HBox.margin>
+                        <Insets left="5.0" />
+                    </HBox.margin>
+                </Label>
                 <MenuButton fx:id="menuBoutonUtilisateur" text="Options" styleClass="menu-bouton-utilisateur">
                     <items>
-                        <MenuItem fx:id="menuItemProfilUtilisateur" text="Mon Profil (Bientôt)" disable="true"/>
+                        <MenuItem fx:id="menuItemProfilUtilisateur" text="Mon Profil" disable="true"/>
                         <SeparatorMenuItem />
                         <MenuItem fx:id="menuItemDeconnexion" text="Déconnexion" onAction="#actionDeconnexionUtilisateur"/>
                     </items>
@@ -65,19 +69,18 @@
         </VBox>
     </top>
     <center>
-        <!-- Le contenu des modules sera chargé ici par conteneurPrincipalApplication.setCenter(vueChargee) -->
-        <!-- Un ScrollPane peut être utile si les vues de module sont grandes -->
-        <!-- <ScrollPane fx:id="conteneurContenuModule" fitToWidth="true" fitToHeight="true" style="-fx-background-color: #F4F6F6;">
-              <content>
-                  <VBox fx:id="zoneContenuDynamiqueModule" alignment="TOP_CENTER" spacing="20.0" style="-fx-background-color: transparent;">
-                      <padding><Insets top="15.0" left="15.0" right="15.0" bottom="15.0" /></padding>
-                  </VBox>
-              </content>
-          </ScrollPane> -->
+        <ScrollPane fx:id="conteneurContenuModule" fitToWidth="true" fitToHeight="true" style="-fx-background-color: -fx-lightest-gray;">
+            <content>
+                <VBox fx:id="zoneContenuDynamiqueModule" alignment="TOP_CENTER" spacing="20.0" style="-fx-background-color: transparent;">
+                    <padding><Insets top="20.0" left="20.0" right="20.0" bottom="20.0" /></padding>
+                    <!-- Le contenu des modules sera chargé ici -->
+                </VBox>
+            </content>
+        </ScrollPane>
     </center>
     <bottom>
-        <HBox alignment="CENTER_RIGHT" styleClass="footer-bar" prefHeight="30.0">
-            <padding><Insets right="10.0"/></padding>
+        <HBox alignment="CENTER_RIGHT" styleClass="footer-bar" prefHeight="35.0">
+            <padding><Insets right="15.0"/></padding>
             <Label text="© 2025 MIAGE Holding - Tous droits réservés." styleClass="texte-footer"/>
         </HBox>
     </bottom>

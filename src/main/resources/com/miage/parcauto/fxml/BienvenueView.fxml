@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.TextAlignment?>
+
+<VBox alignment="CENTER" spacing="20.0" prefHeight="400.0" prefWidth="600.0" stylesheets="@../css/styles-all.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.BienvenueController">
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20" />
+    </padding>
+    <Label styleClass="titre-section" text="Bienvenue !" textAlignment="CENTER">
+        <VBox.margin>
+            <Insets bottom="20.0" />
+        </VBox.margin>
+    </Label>
+    <Label fx:id="labelMessageAccueilUtilisateur" styleClass="sous-titre-section" textAlignment="CENTER" wrapText="true" maxWidth="700.0" text="Chargement des informations d'accueil...">
+        <padding>
+            <Insets top="10" bottom="10" />
+        </padding>
+    </Label>
+    <Label text="Cette application vous permet de gérer efficacement toutes les opérations liées au parc automobile de MIAGE Holding." textAlignment="CENTER" wrapText="true" maxWidth="600.0" style="-fx-font-size: 14px;">
+    </Label>
+</VBox>

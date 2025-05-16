@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Spinner?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox spacing="15.0" styleClass="formulaire-conteneur" stylesheets="@../css/styles-all.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.FormulaireVehiculeController">
+    <padding>
+        <Insets bottom="20.0" left="25.0" right="25.0" top="20.0" />
+    </padding>
+    <Label fx:id="titreFormulaireVehicule" text="Ajouter/Modifier un Véhicule" styleClass="formulaire-titre">
+        <VBox.margin>
+            <Insets bottom="15.0" />
+        </VBox.margin>
+    </Label>
+
+    <GridPane hgap="15.0" vgap="10.0">
+        <columnConstraints>
+            <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="130.0" prefWidth="130.0" />
+            <ColumnConstraints hgrow="ALWAYS" minWidth="250.0" />
+            <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="130.0" prefWidth="130.0" />
+            <ColumnConstraints hgrow="ALWAYS" minWidth="250.0" />
+        </columnConstraints>
+        <rowConstraints>
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="70.0" vgrow="SOMETIMES" />
+        </rowConstraints>
+
+        <Label text="Immatriculation :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+        <TextField fx:id="champImmatriculation" promptText="AA-123-BB" styleClass="formulaire-text-field" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+        <Label fx:id="erreurImmatriculation" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="0" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Marque :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+        <TextField fx:id="champMarque" promptText="Ex: Renault" styleClass="formulaire-text-field" GridPane.columnIndex="3" GridPane.rowIndex="0" />
+        <Label fx:id="erreurMarque" styleClass="formulaire-erreur-message" GridPane.columnIndex="3" GridPane.rowIndex="0" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Modèle :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+        <TextField fx:id="champModele" promptText="Ex: Clio V" styleClass="formulaire-text-field" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+        <Label fx:id="erreurModele" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Numéro de Châssis :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+        <TextField fx:id="champNumeroChassis" promptText="VF1..." styleClass="formulaire-text-field" GridPane.columnIndex="3" GridPane.rowIndex="1" />
+        <Label fx:id="erreurNumeroChassis" styleClass="formulaire-erreur-message" GridPane.columnIndex="3" GridPane.rowIndex="1" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Date Mise en Service :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+        <DatePicker fx:id="datePickerMiseEnService" styleClass="formulaire-date-picker" prefWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+        <Label fx:id="erreurDateMiseEnService" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Kilométrage Actuel :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+        <Spinner fx:id="spinnerKmActuels" min="0" max="9999999" initialValue="0" amountToStepBy="100" editable="true" styleClass="formulaire-numeric-field" prefWidth="Infinity" GridPane.columnIndex="3" GridPane.rowIndex="2" />
+        <Label fx:id="erreurKmActuels" styleClass="formulaire-erreur-message" GridPane.columnIndex="3" GridPane.rowIndex="2" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Type d'Énergie :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+        <ChoiceBox fx:id="choiceBoxEnergie" styleClass="formulaire-choice-box" prefWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+        <Label fx:id="erreurEnergie" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="3" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="État du Véhicule :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+        <ChoiceBox fx:id="choiceBoxEtatVehicule" styleClass="formulaire-choice-box" prefWidth="Infinity" GridPane.columnIndex="3" GridPane.rowIndex="3" />
+        <Label fx:id="erreurEtatVehicule" styleClass="formulaire-erreur-message" GridPane.columnIndex="3" GridPane.rowIndex="3" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Puissance Fiscale (CV) :" styleClass="formulaire-label" GridPane.columnIndex="0" GridPane.rowIndex="4" />
+        <Spinner fx:id="spinnerPuissanceFiscale" min="0" max="200" initialValue="5" amountToStepBy="1" editable="true" styleClass="formulaire-numeric-field" prefWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+        <Label fx:id="erreurPuissanceFiscale" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="4" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Nombre de Places :" styleClass="formulaire-label" GridPane.columnIndex="2" GridPane.rowIndex="4" />
+        <Spinner fx:id="spinnerNombrePlaces" min="1" max="50" initialValue="5" amountToStepBy="1" editable="true" styleClass="formulaire-numeric-field" prefWidth="Infinity" GridPane.columnIndex="3" GridPane.rowIndex="4" />
+        <Label fx:id="erreurNombrePlaces" styleClass="formulaire-erreur-message" GridPane.columnIndex="3" GridPane.rowIndex="4" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Observations :" styleClass="formulaire-label" GridPane.columnIndex="0" GridPane.rowIndex="5" GridPane.valignment="TOP" />
+        <TextArea fx:id="textAreaObservations" promptText="Détails supplémentaires, état général..." styleClass="formulaire-text-area" prefRowCount="3" GridPane.columnIndex="1" GridPane.rowIndex="5" GridPane.columnSpan="3" />
+        <Label fx:id="erreurObservations" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="5" GridPane.columnSpan="3" GridPane.valignment="BOTTOM">
+            <GridPane.margin><Insets left="5.0" bottom="-15.0"/></GridPane.margin>
+        </Label>
+
+    </GridPane>
+
+    <Label fx:id="labelMessageGlobalErreur" styleClass="formulaire-erreur-message" managed="false" visible="false" VBox.vgrow="NEVER">
+        <VBox.margin>
+            <Insets top="5.0" />
+        </VBox.margin>
+    </Label>
+
+    <HBox alignment="CENTER_RIGHT" spacing="10.0" styleClass="formulaire-bouton-conteneur">
+        <Button fx:id="boutonAnnuler" text="Annuler" onAction="#actionAnnuler" styleClass="formulaire-bouton-annuler" cancelButton="true" />
+        <Button fx:id="boutonValider" text="Valider" onAction="#actionValiderFormulaire" styleClass="formulaire-bouton-valider" defaultButton="true" />
+    </HBox>
+</VBox>

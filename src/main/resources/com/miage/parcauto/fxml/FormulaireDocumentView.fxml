@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.RowConstraints?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox spacing="15.0" styleClass="formulaire-conteneur" stylesheets="@../css/styles-all.css" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.FormulaireDocumentController">
+    <padding>
+        <Insets bottom="20.0" left="25.0" right="25.0" top="20.0" />
+    </padding>
+    <Label fx:id="titreFormulaireDocument" text="Uploader un Nouveau Document Sociétaire" styleClass="formulaire-titre">
+        <VBox.margin>
+            <Insets bottom="15.0" />
+        </VBox.margin>
+    </Label>
+
+    <GridPane hgap="15.0" vgap="10.0">
+        <columnConstraints>
+            <ColumnConstraints halignment="RIGHT" hgrow="NEVER" minWidth="180.0" prefWidth="180.0" />
+            <ColumnConstraints hgrow="ALWAYS" minWidth="300.0" />
+        </columnConstraints>
+        <rowConstraints>
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="35.0" vgrow="SOMETIMES" />
+            <RowConstraints minHeight="10.0" prefHeight="70.0" vgrow="SOMETIMES" />
+        </rowConstraints>
+
+        <Label text="Sociétaire Concerné :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+        <ChoiceBox fx:id="choiceBoxSocietaireDocument" styleClass="formulaire-choice-box" prefWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+        <Label fx:id="erreurSocietaireDocument" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="0" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Type de Document :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+        <ChoiceBox fx:id="choiceBoxTypeDocument" styleClass="formulaire-choice-box" prefWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+        <Label fx:id="erreurTypeDocument" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="1" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Fichier à Uploader :" styleClass="formulaire-label-obligatoire" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+        <HBox spacing="10" alignment="CENTER_LEFT" GridPane.columnIndex="1" GridPane.rowIndex="2">
+            <TextField fx:id="champCheminFichierSelectionne" promptText="Aucun fichier sélectionné" styleClass="formulaire-text-field" editable="false" HBox.hgrow="ALWAYS"/>
+            <Button fx:id="boutonParcourirFichier" text="Parcourir..." onAction="#actionParcourirFichier" styleClass="bouton-secondaire"/>
+        </HBox>
+        <Label fx:id="erreurFichierSelectionne" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="2" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Date d'Émission (si applicable) :" styleClass="formulaire-label" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+        <DatePicker fx:id="datePickerDateEmissionDocument" styleClass="formulaire-date-picker" prefWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+        <Label fx:id="erreurDateEmissionDocument" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="3" GridPane.halignment="LEFT">
+            <GridPane.margin><Insets left="5.0" top="35.0"/></GridPane.margin>
+        </Label>
+
+        <Label text="Description/Notes :" styleClass="formulaire-label" GridPane.columnIndex="0" GridPane.rowIndex="4" GridPane.valignment="TOP"/>
+        <TextArea fx:id="textAreaDescriptionDocument" promptText="Brève description du contenu ou notes importantes..." styleClass="formulaire-text-area" prefRowCount="3" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+        <Label fx:id="erreurDescriptionDocument" styleClass="formulaire-erreur-message" GridPane.columnIndex="1" GridPane.rowIndex="4" GridPane.valignment="BOTTOM">
+            <GridPane.margin><Insets left="5.0" bottom="-15.0"/></GridPane.margin>
+        </Label>
+
+    </GridPane>
+
+    <Label fx:id="labelMessageGlobalErreur" styleClass="formulaire-erreur-message" managed="false" visible="false" VBox.vgrow="NEVER">
+        <VBox.margin>
+            <Insets top="5.0" />
+        </VBox.margin>
+    </Label>
+
+    <HBox alignment="CENTER_RIGHT" spacing="10.0" styleClass="formulaire-bouton-conteneur">
+        <Button fx:id="boutonAnnuler" text="Annuler" onAction="#actionAnnuler" styleClass="formulaire-bouton-annuler" cancelButton="true" />
+        <Button fx:id="boutonValiderUpload" text="Valider et Uploader" onAction="#actionValiderFormulaireUpload" styleClass="formulaire-bouton-valider" defaultButton="true" />
+    </HBox>
+</VBox>
