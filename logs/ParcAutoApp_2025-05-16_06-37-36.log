@@ -1,0 +1,41 @@
+[2025-05-16 06:37:36.229] [INFOS] [main.java.com.miage.parcauto] Système de logging initialisé. Fichier de log: logs\ParcAutoApp_2025-05-16_06-37-36.log
+[2025-05-16 06:37:36.266] [INFOS] [main.java.com.miage.parcauto] Lancement de l'application MainApp.main().
+[2025-05-16 06:37:36.288] [INFOS] [main.java.com.miage.parcauto] Démarrage de l'application ParcAuto MIAGE Holding.
+[2025-05-16 06:37:36.292] [GRAVE] [main.java.com.miage.parcauto.ConfigurationProvider] Le fichier de configuration 'db.properties' est introuvable dans le classpath (attendu dans src/main/resources).
+[2025-05-16 06:37:36.293] [GRAVE] [main.java.com.miage.parcauto] Échec de l'initialisation d'un ou plusieurs services fondamentaux.
+java.lang.RuntimeException: Le fichier de configuration 'db.properties' est introuvable dans le classpath (attendu dans src/main/resources).
+	at main.java.com.miage.parcauto.ConfigurationProvider.chargerProprietes(ConfigurationProvider.java:35)
+	at main.java.com.miage.parcauto.ConfigurationProvider.<init>(ConfigurationProvider.java:20)
+	at main.java.com.miage.parcauto.ConfigurationProvider.getInstance(ConfigurationProvider.java:25)
+	at main.java.com.miage.parcauto.MainApp.initialiserServicesFondamentaux(MainApp.java:131)
+	at main.java.com.miage.parcauto.MainApp.start(MainApp.java:116)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.LauncherImpl.lambda$launchApplication1$9(LauncherImpl.java:839)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runAndWait$12(PlatformImpl.java:483)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runLater$10(PlatformImpl.java:456)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:400)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runLater$11(PlatformImpl.java:455)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.InvokeLaterDispatcher$Future.run(InvokeLaterDispatcher.java:95)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.win.WinApplication._runLoop(Native Method)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.win.WinApplication.lambda$runLoop$3(WinApplication.java:185)
+	at java.base/java.lang.Thread.run(Thread.java:1570)
+
+[2025-05-16 06:37:36.294] [GRAVE] [main.java.com.miage.parcauto] Erreur irrécupérable lors du démarrage de l'application: Impossible d'initialiser les services de l'application.
+java.lang.RuntimeException: Impossible d'initialiser les services de l'application.
+	at main.java.com.miage.parcauto.MainApp.initialiserServicesFondamentaux(MainApp.java:156)
+	at main.java.com.miage.parcauto.MainApp.start(MainApp.java:116)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.LauncherImpl.lambda$launchApplication1$9(LauncherImpl.java:839)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runAndWait$12(PlatformImpl.java:483)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runLater$10(PlatformImpl.java:456)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:400)
+	at javafx.graphics@21.0.7/com.sun.javafx.application.PlatformImpl.lambda$runLater$11(PlatformImpl.java:455)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.InvokeLaterDispatcher$Future.run(InvokeLaterDispatcher.java:95)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.win.WinApplication._runLoop(Native Method)
+	at javafx.graphics@21.0.7/com.sun.glass.ui.win.WinApplication.lambda$runLoop$3(WinApplication.java:185)
+	at java.base/java.lang.Thread.run(Thread.java:1570)
+Caused by: java.lang.RuntimeException: Le fichier de configuration 'db.properties' est introuvable dans le classpath (attendu dans src/main/resources).
+	at main.java.com.miage.parcauto.ConfigurationProvider.chargerProprietes(ConfigurationProvider.java:35)
+	at main.java.com.miage.parcauto.ConfigurationProvider.<init>(ConfigurationProvider.java:20)
+	at main.java.com.miage.parcauto.ConfigurationProvider.getInstance(ConfigurationProvider.java:25)
+	at main.java.com.miage.parcauto.MainApp.initialiserServicesFondamentaux(MainApp.java:131)
+	... 10 more
+
