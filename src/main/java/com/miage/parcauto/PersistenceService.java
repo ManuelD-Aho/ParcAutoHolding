@@ -8,9 +8,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PersistenceService {
-
+    private static final Logger LOGGER_PERSISTANCE = Logger.getLogger(PersistenceService.class.getName());
     private Affectation mapResultSetToAffectation(ResultSet rs) throws SQLException {
         Affectation affectation = new Affectation();
         affectation.setId(rs.getInt("id"));
@@ -1807,4 +1809,350 @@ public class PersistenceService {
             throw new ErreurBaseDeDonnees("Erreur lors de la suppression du véhicule par ID: " + idVehicule + ". Vérifiez les dépendances non gérées.", e);
         }
     }
-}
+        public List<Vehicule> trouverVehiculesParEtat(int idEtatVoiture) {
+            List<Vehicule> vehicules = new ArrayList<>();
+            String sql = "SELECT * FROM VEHICULES WHERE id_etat_voiture = ? ORDER BY marque, modele";
+            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, idEtatVoiture);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        vehicules.add(extraireVehiculeDepuisResultSet(rs));
+                    }
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la récupération des véhicules par état.", e);
+                throw new ErreurBaseDeDonnees("Impossible de récupérer les véhicules par état.", e);
+            }
+            return vehicules;
+        }
+
+        public SocietaireCompte trouverSocietaireCompteParIdPersonnel(int idPersonnel) {
+            String sql = "SELECT * FROM SOCIETAIRE_COMPTE WHERE id_personnel = ?";
+            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, idPersonnel);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) return extraireSocietaireCompteDepuisResultSet(rs);
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche sociétaire par ID Personnel: " + idPersonnel, e);
+                throw new ErreurBaseDeDonnees("Impossible de trouver sociétaire par ID Personnel.", e);
+            }
+            return null; // Peut y avoir plusieurs comptes pour un personnel? Schema dit non.
+        }
+
+        public List<DocumentSocietaire> trouverDocumentsParType(TypeDocumentSocietaire typeDoc) {
+            List<DocumentSocietaire> documents = new ArrayList<>();
+            String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE WHERE type_doc = ? ORDER BY date_upload DESC";
+            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, typeDoc.getDbValue());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        documents.add(extraireDocumentSocietaireDepuisResultSet(rs));
+                    }
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche documents par type: " + typeDoc, e);
+                throw new ErreurBaseDeDonnees("Impossible de trouver documents par type.", e);
+            }
+            return documents;
+        }
+
+        public List<DocumentSocietaire> trouverDocumentsParSocietaireEtType(int idSocietaire, TypeDocumentSocietaire typeDoc) {
+            List<DocumentSocietaire> documents = new ArrayList<>();
+            String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE WHERE id_societaire = ? AND type_doc = ? ORDER BY date_upload DESC";
+            try (Connection conn = dbUtil.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, idSocietaire);
+                pstmt.setString(2, typeDoc.getDbValue());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        documents.add(extraireDocumentSocietaireDepuisResultSet(rs));
+                    }
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL recherche documents pour sociétaire " + idSocietaire + " et type " + typeDoc, e);
+                throw new ErreurBaseDeDonnees("Impossible de trouver documents par sociétaire et type.", e);
+            }
+            return documents;
+        }
+
+        public List<DocumentSocietaire> trouverTousLesDocumentsSocietaires() {
+            List<DocumentSocietaire> documents = new ArrayList<>();
+            String sql = "SELECT * FROM DOCUMENT_SOCIETAIRE ORDER BY id_societaire, date_upload DESC";
+            try (Connection conn = dbUtil.getConnection();
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    documents.add(extraireDocumentSocietaireDepuisResultSet(rs));
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors de la récupération de tous les documents sociétaires.", e);
+                throw new ErreurBaseDeDonnees("Impossible de récupérer tous les documents sociétaires.", e);
+            }
+            return documents;
+        }
+
+        public int compterTousLesVehicules() {
+            String sql = "SELECT COUNT(*) FROM VEHICULES";
+            try (Connection conn = dbUtil.getConnection();
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des véhicules.", e);
+                throw new ErreurBaseDeDonnees("Impossible de compter les véhicules.", e);
+            }
+            return 0;
+        }
+
+        public int compterMissionsParStatut(StatutMission statut) {
+            String sql = "SELECT COUNT(*) FROM MISSION WHERE status = ?";
+            try (Connection conn = dbUtil.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, statut.getDbValue());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des missions par statut: " + statut, e);
+                throw new ErreurBaseDeDonnees("Impossible de compter les missions par statut.", e);
+            }
+            return 0;
+        }
+
+        public int compterEntretiensParStatutOT(StatutOrdreTravail statutOT) {
+            String sql = "SELECT COUNT(*) FROM ENTRETIEN WHERE statut_ot = ?";
+            try (Connection conn = dbUtil.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, statutOT.getDbValue());
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                }
+            } catch (SQLException e) {
+                LOGGER_PERSISTANCE.log(Level.SEVERE, "Erreur SQL lors du comptage des entretiens par statut OT: " + statutOT, e);
+                throw new ErreurBaseDeDonnees("Impossible de compter les entretiens par statut OT.", e);
+            }
+            return 0;
+        }
+
+        // Méthodes d'extraction depuis ResultSet
+        private Vehicule extraireVehiculeDepuisResultSet(ResultSet rs) throws SQLException {
+            Vehicule v = new Vehicule();
+            v.setIdVehicule(rs.getInt("id_vehicule"));
+            v.setIdEtatVoiture(rs.getInt("id_etat_voiture"));
+            v.setEnergie(EnergieVehicule.fromDbValue(rs.getString("energie")));
+            v.setNumeroChassi(rs.getString("numero_chassi"));
+            v.setImmatriculation(rs.getString("immatriculation"));
+            v.setMarque(rs.getString("marque"));
+            v.setModele(rs.getString("modele"));
+            v.setNbPlaces(rs.getObject("nb_places", Integer.class));
+            Timestamp tsAcquisition = rs.getTimestamp("date_acquisition");
+            if (tsAcquisition != null) v.setDateAcquisition(tsAcquisition.toLocalDateTime());
+            Timestamp tsAmmortissement = rs.getTimestamp("date_ammortissement");
+            if (tsAmmortissement != null) v.setDateAmmortissement(tsAmmortissement.toLocalDateTime());
+            Timestamp tsMiseService = rs.getTimestamp("date_mise_en_service");
+            if (tsMiseService != null) v.setDateMiseEnService(tsMiseService.toLocalDateTime());
+            v.setPuissance(rs.getObject("puissance", Integer.class));
+            v.setCouleur(rs.getString("couleur"));
+            v.setPrixVehicule(rs.getBigDecimal("prix_vehicule"));
+            v.setKmActuels(rs.getObject("km_actuels", Integer.class));
+            Timestamp tsEtat = rs.getTimestamp("date_etat");
+            if (tsEtat != null) v.setDateEtat(tsEtat.toLocalDateTime());
+            return v;
+        }
+
+        private Mission extraireMissionDepuisResultSet(ResultSet rs) throws SQLException {
+            Mission m = new Mission();
+            m.setIdMission(rs.getInt("id_mission"));
+            m.setIdVehicule(rs.getInt("id_vehicule"));
+            m.setLibMission(rs.getString("lib_mission"));
+            m.setSite(rs.getString("site"));
+            Timestamp tsDebut = rs.getTimestamp("date_debut_mission");
+            if (tsDebut != null) m.setDateDebutMission(tsDebut.toLocalDateTime());
+            Timestamp tsFin = rs.getTimestamp("date_fin_mission");
+            if (tsFin != null) m.setDateFinMission(tsFin.toLocalDateTime());
+            m.setKmPrevu(rs.getObject("km_prevu", Integer.class));
+            m.setKmReel(rs.getObject("km_reel", Integer.class));
+            m.setStatus(StatutMission.fromDbValue(rs.getString("status")));
+            m.setCoutTotal(rs.getBigDecimal("cout_total"));
+            m.setCircuitMission(rs.getString("circuit_mission"));
+            m.setObservationMission(rs.getString("observation_mission"));
+            return m;
+        }
+
+        private Affectation extraireAffectationDepuisResultSet(ResultSet rs) throws SQLException {
+            Affectation a = new Affectation();
+            a.setId(rs.getInt("id"));
+            a.setIdVehicule(rs.getInt("id_vehicule"));
+            a.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
+            a.setIdSocietaire(rs.getObject("id_societaire", Integer.class));
+            a.setType(TypeAffectation.fromDbValue(rs.getString("type")));
+            a.setDateDebut(rs.getTimestamp("date_debut").toLocalDateTime());
+            Timestamp dateFinTs = rs.getTimestamp("date_fin");
+            if (dateFinTs != null) {
+                a.setDateFin(dateFinTs.toLocalDateTime());
+            }
+            return a;
+        }
+
+        private DepenseMission extraireDepenseMissionDepuisResultSet(ResultSet rs) throws SQLException {
+            DepenseMission d = new DepenseMission();
+            d.setId(rs.getInt("id"));
+            d.setIdMission(rs.getInt("id_mission"));
+            d.setNature(NatureDepense.fromDbValue(rs.getString("nature")));
+            d.setMontant(rs.getBigDecimal("montant"));
+            d.setJustificatif(rs.getString("justificatif"));
+            return d;
+        }
+
+        private Entretien extraireEntretienDepuisResultSet(ResultSet rs) throws SQLException {
+            Entretien e = new Entretien();
+            e.setIdEntretien(rs.getInt("id_entretien"));
+            e.setIdVehicule(rs.getInt("id_vehicule"));
+            Timestamp tsEntree = rs.getTimestamp("date_entree_entr");
+            if (tsEntree != null) e.setDateEntreeEntr(tsEntree.toLocalDateTime());
+            Timestamp tsSortie = rs.getTimestamp("date_sortie_entr");
+            if (tsSortie != null) e.setDateSortieEntr(tsSortie.toLocalDateTime());
+            e.setMotifEntr(rs.getString("motif_entr"));
+            e.setObservation(rs.getString("observation"));
+            e.setCoutEntr(rs.getBigDecimal("cout_entr"));
+            e.setLieuEntr(rs.getString("lieu_entr"));
+            String typeStr = rs.getString("type");
+            if (typeStr != null) e.setType(TypeEntretien.fromDbValue(typeStr));
+            String statutOtStr = rs.getString("statut_ot");
+            if (statutOtStr != null) e.setStatutOt(StatutOrdreTravail.fromDbValue(statutOtStr));
+            return e;
+        }
+
+        private SocietaireCompte extraireSocietaireCompteDepuisResultSet(ResultSet rs) throws SQLException {
+            SocietaireCompte sc = new SocietaireCompte();
+            sc.setIdSocietaire(rs.getInt("id_societaire"));
+            sc.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
+            sc.setNom(rs.getString("nom"));
+            sc.setNumero(rs.getString("numero"));
+            sc.setSolde(rs.getBigDecimal("solde"));
+            sc.setEmail(rs.getString("email"));
+            sc.setTelephone(rs.getString("telephone"));
+            return sc;
+        }
+
+        private Mouvement extraireMouvementDepuisResultSet(ResultSet rs) throws SQLException {
+            Mouvement m = new Mouvement();
+            m.setId(rs.getInt("id"));
+            m.setIdSocietaire(rs.getInt("id_societaire"));
+            m.setDate(rs.getTimestamp("date").toLocalDateTime());
+            m.setType(TypeMouvement.fromDbValue(rs.getString("type")));
+            m.setMontant(rs.getBigDecimal("montant"));
+            return m;
+        }
+
+        private DocumentSocietaire extraireDocumentSocietaireDepuisResultSet(ResultSet rs) throws SQLException {
+            DocumentSocietaire d = new DocumentSocietaire();
+            d.setIdDoc(rs.getInt("id_doc"));
+            d.setIdSocietaire(rs.getInt("id_societaire"));
+            d.setTypeDoc(TypeDocumentSocietaire.fromDbValue(rs.getString("type_doc")));
+            d.setCheminFichier(rs.getString("chemin_fichier"));
+            d.setDateUpload(rs.getTimestamp("date_upload").toLocalDateTime());
+            return d;
+        }
+
+        private Utilisateur extraireUtilisateurDepuisResultSet(ResultSet rs) throws SQLException {
+            Utilisateur u = new Utilisateur();
+            u.setId(rs.getInt("id"));
+            u.setLogin(rs.getString("login"));
+            u.setHashMdp(rs.getString("hash"));
+            u.setRole(RoleUtilisateur.fromDbValue(rs.getString("role")));
+            u.setIdPersonnel(rs.getObject("id_personnel", Integer.class));
+            u.setMfaSecret(rs.getString("mfa_secret"));
+            return u;
+        }
+
+        private Personnel extrairePersonnelDepuisResultSet(ResultSet rs) throws SQLException {
+            Personnel p = new Personnel();
+            p.setIdPersonnel(rs.getInt("id_personnel"));
+            p.setIdService(rs.getObject("id_service", Integer.class));
+            p.setIdFonction(rs.getObject("id_fonction", Integer.class));
+            p.setIdVehicule(rs.getObject("id_vehicule", Integer.class)); // Peut être null
+            p.setMatricule(rs.getString("matricule"));
+            p.setNomPersonnel(rs.getString("nom_personnel"));
+            p.setPrenomPersonnel(rs.getString("prenom_personnel"));
+            p.setEmail(rs.getString("email"));
+            p.setTelephone(rs.getString("telephone"));
+            p.setAdresse(rs.getString("adresse"));
+            Date dateNaissanceSql = rs.getDate("date_naissance");
+            if (dateNaissanceSql != null) p.setDateNaissance(dateNaissanceSql.toLocalDate());
+            String sexeStr = rs.getString("sexe");
+            if (sexeStr != null) p.setSexe(SexePersonnel.fromDbValue(sexeStr));
+            Timestamp dateAttributionTs = rs.getTimestamp("date_attribution");
+            if (dateAttributionTs != null) p.setDateAttribution(dateAttributionTs.toLocalDateTime());
+            return p;
+        }
+
+
+        // Méthodes pour définir les paramètres des PreparedStatement
+        private void definirParametresVehiculeStatement(PreparedStatement pstmt, Vehicule v) throws SQLException {
+            pstmt.setInt(1, v.getIdEtatVoiture());
+            pstmt.setString(2, v.getEnergie().getDbValue());
+            pstmt.setString(3, v.getNumeroChassi());
+            pstmt.setString(4, v.getImmatriculation());
+            pstmt.setString(5, v.getMarque());
+            pstmt.setString(6, v.getModele());
+            pstmt.setObject(7, v.getNbPlaces());
+            pstmt.setTimestamp(8, v.getDateAcquisition() != null ? Timestamp.valueOf(v.getDateAcquisition()) : null);
+            pstmt.setTimestamp(9, v.getDateAmmortissement() != null ? Timestamp.valueOf(v.getDateAmmortissement()) : null);
+            pstmt.setTimestamp(10, v.getDateMiseEnService() != null ? Timestamp.valueOf(v.getDateMiseEnService()) : null);
+            pstmt.setObject(11, v.getPuissance());
+            pstmt.setString(12, v.getCouleur());
+            pstmt.setBigDecimal(13, v.getPrixVehicule());
+            pstmt.setObject(14, v.getKmActuels());
+            pstmt.setTimestamp(15, v.getDateEtat() != null ? Timestamp.valueOf(v.getDateEtat()) : Timestamp.valueOf(LocalDateTime.now()));
+        }
+
+        private void definirParametresMissionStatement(PreparedStatement pstmt, Mission m) throws SQLException {
+            pstmt.setInt(1, m.getIdVehicule());
+            pstmt.setString(2, m.getLibMission());
+            pstmt.setString(3, m.getSite());
+            pstmt.setTimestamp(4, m.getDateDebutMission() != null ? Timestamp.valueOf(m.getDateDebutMission()) : null);
+            pstmt.setTimestamp(5, m.getDateFinMission() != null ? Timestamp.valueOf(m.getDateFinMission()) : null);
+            pstmt.setObject(6, m.getKmPrevu());
+            pstmt.setObject(7, m.getKmReel());
+            pstmt.setString(8, m.getStatus().getDbValue());
+            pstmt.setBigDecimal(9, m.getCoutTotal());
+            pstmt.setString(10, m.getCircuitMission());
+            pstmt.setString(11, m.getObservationMission());
+        }
+
+        private void definirParametresEntretienStatement(PreparedStatement pstmt, Entretien e) throws SQLException {
+            pstmt.setInt(1, e.getIdVehicule());
+            pstmt.setTimestamp(2, e.getDateEntreeEntr() != null ? Timestamp.valueOf(e.getDateEntreeEntr()) : null);
+            pstmt.setTimestamp(3, e.getDateSortieEntr() != null ? Timestamp.valueOf(e.getDateSortieEntr()) : null);
+            pstmt.setString(4, e.getMotifEntr());
+            pstmt.setString(5, e.getObservation());
+            pstmt.setBigDecimal(6, e.getCoutEntr());
+            pstmt.setString(7, e.getLieuEntr());
+            pstmt.setString(8, e.getType() != null ? e.getType().getDbValue() : null);
+            pstmt.setString(9, e.getStatutOt() != null ? e.getStatutOt().getDbValue() : StatutOrdreTravail.OUVERT.getDbValue());
+        }
+
+        private void definirParametresSocietaireCompteStatement(PreparedStatement pstmt, SocietaireCompte sc) throws SQLException {
+            pstmt.setObject(1, sc.getIdPersonnel());
+            pstmt.setString(2, sc.getNom());
+            pstmt.setString(3, sc.getNumero());
+            pstmt.setBigDecimal(4, sc.getSolde());
+            pstmt.setString(5, sc.getEmail());
+            pstmt.setString(6, sc.getTelephone());
+        }
+
+        private void definirParametresUtilisateurStatement(PreparedStatement pstmt, Utilisateur u) throws SQLException {
+            pstmt.setString(1, u.getLogin());
+            pstmt.setString(2, u.getHashMdp());
+            pstmt.setString(3, u.getRole().getDbValue());
+            pstmt.setObject(4, u.getIdPersonnel());
+            pstmt.setString(5, u.getMfaSecret());
+        }
+    }

@@ -634,19 +634,25 @@ public class AppModels {
     }
 
     public enum RoleUtilisateur {
-        U1("U1"),
-        U2("U2"),
-        U3("U3"),
-        U4("U4");
+        U1("U1", "Conducteur"),
+        U2("U2", "Gestionnaire de Parc"),
+        U3("U3", "Sociétaire"),
+        U4("U4", "Administrateur Système");
 
         private final String dbValue;
+        private final String libelleInterface;
 
-        RoleUtilisateur(String dbValue) {
+        RoleUtilisateur(String dbValue, String libelleInterface) {
             this.dbValue = dbValue;
+            this.libelleInterface = libelleInterface;
         }
 
         public String getDbValue() {
             return dbValue;
+        }
+
+        public String getLibelleInterface() {
+            return libelleInterface;
         }
 
         public static RoleUtilisateur fromDbValue(String dbValue) {

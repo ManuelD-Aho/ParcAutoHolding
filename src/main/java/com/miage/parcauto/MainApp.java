@@ -79,7 +79,7 @@ public class MainApp extends Application {
                             sb.append(sw.toString());
                             sb.append(System.lineSeparator());
                         } catch (Exception ex) {
-                            // Ne devrait pas arriver avec StringWriter/PrintWriter
+                            // Ne devrait pas arriver
                         }
                     }
                     return sb.toString();
@@ -95,13 +95,13 @@ public class MainApp extends Application {
             consoleHandler.setLevel(Level.INFO);
             APPLICATION_LOGGER.addHandler(consoleHandler);
 
-            APPLICATION_LOGGER.setLevel(Level.ALL); // Le logger principal capture tout, les handlers filtrent.
+            APPLICATION_LOGGER.setLevel(Level.ALL);
             APPLICATION_LOGGER.setUseParentHandlers(false);
 
-            APPLICATION_LOGGER.info("Système de journalisation initialisé. Les logs sont dirigés vers: " + nomFichierLog);
+            APPLICATION_LOGGER.info("Système de journalisation initialisé. Logs vers: " + nomFichierLog);
 
         } catch (IOException e) {
-            System.err.println("ERREUR CRITIQUE : Impossible d'initialiser le système de journalisation des événements : " + e.getMessage());
+            System.err.println("ERREUR CRITIQUE : Impossible d'initialiser le système de journalisation : " + e.getMessage());
             e.printStackTrace(System.err);
         }
     }
@@ -109,10 +109,10 @@ public class MainApp extends Application {
 
     @Override
     public void start(Stage stage) {
-        APPLICATION_LOGGER.info("Démarrage de l'application ParcAuto MIAGE Holding, version 1.0.");
+        APPLICATION_LOGGER.info("Démarrage de l'application ParcAuto MIAGE Holding.");
         primaryStageInstance = stage;
         primaryStageInstance.setOnCloseRequest(event -> {
-            APPLICATION_LOGGER.info("Signal de fermeture de l'application reçu. Arrêt en cours.");
+            APPLICATION_LOGGER.info("Signal de fermeture de l'application reçu. Arrêt.");
             Platform.exit();
             System.exit(0);
         });
@@ -121,52 +121,44 @@ public class MainApp extends Application {
             initialiserInfrastructureApplicative();
             chargerInterfaceConnexion();
         } catch (Exception e) {
-            APPLICATION_LOGGER.log(Level.SEVERE, "Erreur irrécupérable et fatale lors de la phase de démarrage de l'application: " + e.getMessage(), e);
+            APPLICATION_LOGGER.log(Level.SEVERE, "Erreur fatale lors du démarrage: " + e.getMessage(), e);
             afficherNotificationCritique("Erreur Fatale au Démarrage",
-                    "Une défaillance majeure est survenue, empêchant le lancement de l'application.",
-                    "Veuillez consulter les journaux d'événements (logs) dans le répertoire '" + DOSSIER_LOGS + "' pour une analyse détaillée.\nCause: " + e.getClass().getSimpleName() + " - " + e.getMessage() +
-                            "\nL'application va maintenant se terminer de manière abrupte.");
+                    "Une défaillance majeure empêche le lancement.",
+                    "Consultez les logs dans '" + DOSSIER_LOGS + "'.\nCause: " + e.getClass().getSimpleName() + " - " + e.getMessage() +
+                            "\nL'application va se terminer.");
             Platform.exit();
             System.exit(1);
         }
     }
 
     private void initialiserInfrastructureApplicative() throws RuntimeException {
-        APPLICATION_LOGGER.info("Initialisation de l'infrastructure applicative et des services principaux.");
+        APPLICATION_LOGGER.info("Initialisation de l'infrastructure applicative.");
         try {
-            // L'initialisation de dbUtil (et donc le chargement de db.properties)
-            // se fait via son bloc static. Si dbUtil échoue, une RuntimeException sera levée.
-            // Nous validons explicitement la connectivité.
-            APPLICATION_LOGGER.fine("Tentative de validation de la connexion à la base de données via dbUtil.");
+            APPLICATION_LOGGER.fine("Validation de la connexion à la base de données.");
             try (Connection testConn = dbUtil.getConnection()) {
                 if (testConn == null || testConn.isClosed()) {
-                    APPLICATION_LOGGER.severe("Test de connexion à la base de données a échoué : connexion nulle ou déjà fermée après obtention.");
-                    throw new RuntimeException("Validation de la connexion à la base de données a échoué : connexion invalide retournée par dbUtil.");
+                    throw new RuntimeException("Validation connexion BDD échouée : connexion invalide.");
                 }
-                APPLICATION_LOGGER.info("Validation de la connectivité à la base de données réussie.");
+                APPLICATION_LOGGER.info("Connectivité à la base de données validée.");
             } catch (SQLException e) {
-                APPLICATION_LOGGER.log(Level.SEVERE, "Échec critique du test de connexion initial à la base de données. Vérifiez db.properties et l'état du serveur MySQL.", e);
-                throw new RuntimeException("Impossible d'établir ou de valider la connexion initiale à la base de données.", e);
-            } catch (Exception e) {
-                APPLICATION_LOGGER.log(Level.SEVERE, "Erreur inattendue lors de l'initialisation statique de dbUtil ou du test de connexion.", e);
-                throw new RuntimeException("Problème majeur avec l'utilitaire de base de données dbUtil.", e);
+                throw new RuntimeException("Impossible d'établir/valider la connexion BDD initiale.", e);
             }
 
             persistenceServiceInstance = new PersistenceService();
-            APPLICATION_LOGGER.fine("Service de persistance (PersistenceService) instancié.");
+            APPLICATION_LOGGER.fine("PersistenceService instancié.");
 
             securityManagerInstance = new SecurityManager(persistenceServiceInstance);
-            APPLICATION_LOGGER.fine("Gestionnaire de sécurité (SecurityManager) instancié.");
+            APPLICATION_LOGGER.fine("SecurityManager instancié.");
 
             businessLogicServiceInstance = new BusinessLogicService(persistenceServiceInstance);
-            APPLICATION_LOGGER.fine("Service de logique métier (BusinessLogicService) instancié.");
+            APPLICATION_LOGGER.fine("BusinessLogicService instancié.");
 
             reportingEngineInstance = new ReportingEngine(persistenceServiceInstance);
-            APPLICATION_LOGGER.fine("Moteur de reporting (ReportingEngine) instancié.");
+            APPLICATION_LOGGER.fine("ReportingEngine instancié.");
 
-            APPLICATION_LOGGER.info("Tous les services principaux de l'infrastructure applicative ont été initialisés avec succès.");
+            APPLICATION_LOGGER.info("Tous les services principaux initialisés.");
         } catch (Exception e) {
-            APPLICATION_LOGGER.log(Level.SEVERE, "Échec catastrophique de l'initialisation d'un ou plusieurs services fondamentaux de l'application.", e);
+            APPLICATION_LOGGER.log(Level.SEVERE, "Échec initialisation services fondamentaux.", e);
             throw new RuntimeException("Impossible d'initialiser l'infrastructure applicative.", e);
         }
     }
@@ -175,97 +167,83 @@ public class MainApp extends Application {
         String cheminCompletFXML = PACKAGE_FXML_BASE + nomFichierFxmlSimple;
         URL fxmlUrl = MainApp.class.getResource(cheminCompletFXML);
         if (fxmlUrl == null) {
-            String messageErreurTechnique = "Ressource FXML introuvable : " + cheminCompletFXML + ". Vérifiez que le fichier existe bien à l'emplacement attendu dans les ressources du projet (src/main/resources" + PACKAGE_FXML_BASE + nomFichierFxmlSimple + ").";
-            APPLICATION_LOGGER.severe(messageErreurTechnique);
-            throw new IOException(messageErreurTechnique);
+            String messageErreur = "Ressource FXML introuvable : " + cheminCompletFXML;
+            APPLICATION_LOGGER.severe(messageErreur);
+            throw new IOException(messageErreur);
         }
-        APPLICATION_LOGGER.fine("Préparation du chargement pour le fichier FXML : " + cheminCompletFXML);
+        APPLICATION_LOGGER.fine("Préparation chargement FXML : " + cheminCompletFXML);
         return new FXMLLoader(fxmlUrl);
     }
 
     public static void chargerInterfaceConnexion() throws IOException {
-        APPLICATION_LOGGER.info("Chargement de l'interface de connexion utilisateur (LoginView.fxml).");
+        APPLICATION_LOGGER.info("Chargement de LoginView.fxml.");
         FXMLLoader chargeurFXML = preparerChargeurFXML("LoginView.fxml");
         Parent racineInterface = chargeurFXML.load();
 
         Object controleurObtenu = chargeurFXML.getController();
-        if (controleurObtenu instanceof ViewController.InitializableServices) {
-            ((ViewController.InitializableServices) controleurObtenu).setServices(businessLogicServiceInstance, securityManagerInstance);
-            APPLICATION_LOGGER.fine("Services injectés dans le contrôleur de LoginView via InitializableServices.");
-        } else if (controleurObtenu instanceof ViewController) {
-            ((ViewController) controleurObtenu).setServices(businessLogicServiceInstance, securityManagerInstance);
-            APPLICATION_LOGGER.fine("Services injectés dans le contrôleur de LoginView (instance de ViewController).");
+        if (controleurObtenu instanceof ViewController) { // ViewController gère aussi LoginView
+            ((ViewController) controleurObtenu).injecterDependancesServices(
+                    businessLogicServiceInstance,
+                    securityManagerInstance,
+                    reportingEngineInstance,
+                    persistenceServiceInstance
+            );
+            APPLICATION_LOGGER.fine("Services injectés dans le contrôleur de LoginView.");
         } else {
-            APPLICATION_LOGGER.warning("Le contrôleur de LoginView.fxml (" + (controleurObtenu != null ? controleurObtenu.getClass().getName() : "null") + ") n'est pas compatible avec l'injection de services (ni ViewController, ni InitializableServices).");
+            APPLICATION_LOGGER.warning("Contrôleur de LoginView.fxml type incorrect: " + (controleurObtenu != null ? controleurObtenu.getClass().getName() : "null"));
         }
         controleurActif = controleurObtenu;
 
-        primaryStageInstance.setTitle("ParcAuto MIAGE Holding - Authentification Requise");
+        primaryStageInstance.setTitle("ParcAuto MIAGE Holding - Authentification");
         Scene sceneConnexion = new Scene(racineInterface);
-        // Exemple d'ajout de CSS:
-        // URL cssLoginUrl = MainApp.class.getResource("/main/java/com/miage/parcauto/css/login-theme.css");
-        // if (cssLoginUrl != null) sceneConnexion.getStylesheets().add(cssLoginUrl.toExternalForm());
         primaryStageInstance.setScene(sceneConnexion);
         primaryStageInstance.setMinWidth(550);
         primaryStageInstance.setMinHeight(480);
         primaryStageInstance.setResizable(false);
         primaryStageInstance.centerOnScreen();
         primaryStageInstance.show();
-        APPLICATION_LOGGER.info("Interface de connexion (LoginView.fxml) chargée et affichée à l'utilisateur.");
+        APPLICATION_LOGGER.info("Interface de connexion affichée.");
     }
 
     public static void chargerInterfacePrincipaleApplication() throws IOException {
-        APPLICATION_LOGGER.info("Chargement de l'interface principale de l'application (MainDashboardView.fxml).");
+        APPLICATION_LOGGER.info("Chargement de MainDashboardView.fxml.");
         FXMLLoader chargeurFXML = preparerChargeurFXML("MainDashboardView.fxml");
         Parent racineInterface = chargeurFXML.load();
 
         Object controleurObtenu = chargeurFXML.getController();
         if (controleurObtenu instanceof ViewController) {
             ViewController vc = (ViewController) controleurObtenu;
-            vc.setServices(businessLogicServiceInstance, securityManagerInstance);
+            vc.injecterDependancesServices(
+                    businessLogicServiceInstance,
+                    securityManagerInstance,
+                    reportingEngineInstance,
+                    persistenceServiceInstance
+            );
             APPLICATION_LOGGER.fine("Services injectés dans le contrôleur de MainDashboardView.");
             Platform.runLater(() -> {
-                vc.initialiserApresLogin();
-                APPLICATION_LOGGER.fine("Méthode initialiserApresLogin appelée pour MainDashboardView.");
+                vc.initialiserInterfacePrincipaleApresConnexion(); // Nom de méthode mis à jour
+                APPLICATION_LOGGER.fine("initialiserInterfacePrincipaleApresConnexion appelée pour MainDashboardView.");
             });
         } else {
             String nomClasseControleur = (controleurObtenu != null) ? controleurObtenu.getClass().getName() : "null";
-            APPLICATION_LOGGER.severe("Erreur critique: Le contrôleur de MainDashboardView.fxml (" + nomClasseControleur + ") n'est pas une instance de ViewController. Fonctionnalités principales compromises.");
+            APPLICATION_LOGGER.severe("Erreur: Contrôleur de MainDashboardView.fxml (" + nomClasseControleur + ") n'est pas instance de ViewController.");
             throw new IllegalStateException("Contrôleur principal de type incorrect: " + nomClasseControleur);
         }
         controleurActif = controleurObtenu;
 
-        primaryStageInstance.setTitle("ParcAuto MIAGE Holding - Système de Gestion Intégré du Parc Automobile");
+        primaryStageInstance.setTitle("ParcAuto MIAGE Holding - Système de Gestion Intégré");
         Scene scenePrincipale = new Scene(racineInterface, 1440, 850);
-        // URL cssDashboardUrl = MainApp.class.getResource("/main/java/com/miage/parcauto/css/dashboard.css");
-        // if (cssDashboardUrl != null) scenePrincipale.getStylesheets().add(cssDashboardUrl.toExternalForm());
         primaryStageInstance.setScene(scenePrincipale);
         primaryStageInstance.setMinWidth(1280);
         primaryStageInstance.setMinHeight(760);
         primaryStageInstance.setResizable(true);
-        primaryStageInstance.setMaximized(false); // Peut être true si vous préférez
+        primaryStageInstance.setMaximized(false);
         primaryStageInstance.centerOnScreen();
-        APPLICATION_LOGGER.info("Interface principale (MainDashboardView.fxml) chargée et affichée à l'utilisateur.");
-    }
-
-    public static BusinessLogicService getBusinessLogicService() {
-        return businessLogicServiceInstance;
-    }
-
-    public static SecurityManager getSecurityManager() {
-        return securityManagerInstance;
-    }
-
-    public static ReportingEngine getReportingEngine() {
-        return reportingEngineInstance;
+        APPLICATION_LOGGER.info("Interface principale affichée.");
     }
 
     public static Stage getPrimaryStage(){
         return primaryStageInstance;
-    }
-
-    public static Object getActiveController() {
-        return controleurActif;
     }
 
     private static void afficherNotificationCritique(String titre, String entete, String contenu) {
@@ -283,25 +261,22 @@ public class MainApp extends Application {
         if (Platform.isFxApplicationThread()) {
             tacheAffichage.run();
         } else {
-            // Si nous ne sommes pas sur le thread FX et que la plateforme FX est initialisée, utiliser Platform.runLater.
-            // Si la plateforme n'est pas encore initialisée (très tôt dans start()), cela pourrait ne pas fonctionner.
             try {
                 Platform.runLater(tacheAffichage);
             } catch (IllegalStateException e) {
-                // La plateforme FX n'est pas disponible (par exemple, erreur avant même que `launch` ne soit complètement actif)
-                System.err.println("NOTIFICATION CRITIQUE (hors thread FX et plateforme FX non prête): " + titre + "\n" + entete + "\n" + contenu);
+                System.err.println("NOTIFICATION CRITIQUE (hors thread FX): " + titre + "\n" + entete + "\n" + contenu);
             }
         }
     }
 
     public static void main(String[] args) {
-        APPLICATION_LOGGER.info("Exécution de la méthode main de MainApp. Lancement de l'application JavaFX.");
+        APPLICATION_LOGGER.info("Méthode main. Lancement application JavaFX.");
         try {
             Application.launch(args);
         } catch (Exception e) {
-            APPLICATION_LOGGER.log(Level.SEVERE, "Exception non interceptée au niveau du lancement de l'application JavaFX (Application.launch).", e);
-            System.err.println("Une erreur fatale non gérée est survenue lors du lancement de l'application. Consultez les logs.");
-            System.exit(1); // Quitter en cas d'erreur fatale au lancement même de JavaFX.
+            APPLICATION_LOGGER.log(Level.SEVERE, "Exception non interceptée au lancement JavaFX.", e);
+            System.err.println("Erreur fatale non gérée au lancement. Consultez les logs.");
+            System.exit(1);
         }
     }
 }

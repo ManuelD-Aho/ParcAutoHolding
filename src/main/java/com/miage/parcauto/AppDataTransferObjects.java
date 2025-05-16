@@ -5,12 +5,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-// Remarque: Le package pour AppModels est main.java.com.miage.parcauto.AppModels
-// Si AppModels est une classe conteneur, les imports seraient comme suit:
 import main.java.com.miage.parcauto.AppModels.EnergieVehicule;
 import main.java.com.miage.parcauto.AppModels.StatutMission;
 import main.java.com.miage.parcauto.AppModels.TypeEntretien;
 import main.java.com.miage.parcauto.AppModels.StatutOrdreTravail;
+import main.java.com.miage.parcauto.AppModels.TypeMouvement;
+import main.java.com.miage.parcauto.AppModels.TypeDocumentSocietaire;
+import main.java.com.miage.parcauto.AppModels.RoleUtilisateur;
 
 
 public class AppDataTransferObjects {
@@ -20,11 +21,11 @@ public class AppDataTransferObjects {
         private String immatriculation;
         private String marque;
         private String modele;
-        private String etatLibelle; // Libellé de l'état au lieu de l'ID
+        private String etatLibelle;
         private EnergieVehicule energie;
         private Integer kmActuels;
         private LocalDateTime dateMiseEnService;
-        private String nomPersonnelAttribution; // Si applicable
+        private String nomPersonnelAttribution;
 
         public VehiculeDTO(int idVehicule, String immatriculation, String marque, String modele, String etatLibelle, EnergieVehicule energie, Integer kmActuels, LocalDateTime dateMiseEnService, String nomPersonnelAttribution) {
             this.idVehicule = idVehicule;
@@ -63,7 +64,7 @@ public class AppDataTransferObjects {
     public static class MissionDTO {
         private int idMission;
         private String libMission;
-        private String immatriculationVehicule; // Pour affichage direct
+        private String immatriculationVehicule;
         private String marqueModeleVehicule;
         private LocalDateTime dateDebutMission;
         private LocalDateTime dateFinMission;
@@ -157,10 +158,10 @@ public class AppDataTransferObjects {
     public static class UtilisateurDTO {
         private int id;
         private String login;
-        private AppModels.RoleUtilisateur role;
-        private String nomPersonnelAssocie; // Nom complet du personnel
+        private RoleUtilisateur role;
+        private String nomPersonnelAssocie;
 
-        public UtilisateurDTO(int id, String login, AppModels.RoleUtilisateur role, String nomPersonnelAssocie) {
+        public UtilisateurDTO(int id, String login, RoleUtilisateur role, String nomPersonnelAssocie) {
             this.id = id;
             this.login = login;
             this.role = role;
@@ -173,9 +174,82 @@ public class AppDataTransferObjects {
         public void setId(int id) { this.id = id; }
         public String getLogin() { return login; }
         public void setLogin(String login) { this.login = login; }
-        public AppModels.RoleUtilisateur getRole() { return role; }
-        public void setRole(AppModels.RoleUtilisateur role) { this.role = role; }
+        public RoleUtilisateur getRole() { return role; }
+        public void setRole(RoleUtilisateur role) { this.role = role; }
         public String getNomPersonnelAssocie() { return nomPersonnelAssocie; }
         public void setNomPersonnelAssocie(String nomPersonnelAssocie) { this.nomPersonnelAssocie = nomPersonnelAssocie; }
+    }
+
+    public static class SocietaireCompteDTO {
+        private int idSocietaire;
+        private String nomSocietaire; // Correspond à 'nom' dans le modèle SocietaireCompte
+        private String numeroCompte;
+        private BigDecimal solde;
+        private String email;
+        private String telephone;
+        private Integer idPersonnelAssocie; // Pour la logique de permission U3
+
+        public SocietaireCompteDTO() {}
+
+        public int getIdSocietaire() { return idSocietaire; }
+        public void setIdSocietaire(int idSocietaire) { this.idSocietaire = idSocietaire; }
+        public String getNomSocietaire() { return nomSocietaire; }
+        public void setNomSocietaire(String nomSocietaire) { this.nomSocietaire = nomSocietaire; }
+        public String getNumeroCompte() { return numeroCompte; }
+        public void setNumeroCompte(String numeroCompte) { this.numeroCompte = numeroCompte; }
+        public BigDecimal getSolde() { return solde; }
+        public void setSolde(BigDecimal solde) { this.solde = solde; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public String getTelephone() { return telephone; }
+        public void setTelephone(String telephone) { this.telephone = telephone; }
+        public Integer getIdPersonnelAssocie() { return idPersonnelAssocie; }
+        public void setIdPersonnelAssocie(Integer idPersonnelAssocie) { this.idPersonnelAssocie = idPersonnelAssocie; }
+    }
+
+    public static class MouvementDTO {
+        private int idMouvement;
+        private LocalDateTime dateHeureMouvement;
+        private TypeMouvement type;
+        private BigDecimal montant;
+        // idSocietaire n'est pas nécessaire ici car les mouvements sont affichés dans le contexte d'un sociétaire
+
+        public MouvementDTO() {}
+
+        public int getIdMouvement() { return idMouvement; }
+        public void setIdMouvement(int idMouvement) { this.idMouvement = idMouvement; }
+        public LocalDateTime getDateHeureMouvement() { return dateHeureMouvement; }
+        public void setDateHeureMouvement(LocalDateTime dateHeureMouvement) { this.dateHeureMouvement = dateHeureMouvement; }
+        public TypeMouvement getType() { return type; }
+        public void setType(TypeMouvement type) { this.type = type; }
+        public BigDecimal getMontant() { return montant; }
+        public void setMontant(BigDecimal montant) { this.montant = montant; }
+    }
+
+    public static class DocumentSocietaireDTO {
+        private int idDoc;
+        private int idSocietaire; // Garder pour référence interne si besoin
+        private String nomSocietaire;
+        private TypeDocumentSocietaire typeDoc;
+        private String nomFichier; // Juste le nom du fichier pour l'affichage
+        private String cheminFichierComplet; // Chemin réel sur le serveur pour téléchargement/suppression
+        private LocalDateTime dateUpload;
+
+        public DocumentSocietaireDTO() {}
+
+        public int getIdDoc() { return idDoc; }
+        public void setIdDoc(int idDoc) { this.idDoc = idDoc; }
+        public int getIdSocietaire() { return idSocietaire; }
+        public void setIdSocietaire(int idSocietaire) { this.idSocietaire = idSocietaire; }
+        public String getNomSocietaire() { return nomSocietaire; }
+        public void setNomSocietaire(String nomSocietaire) { this.nomSocietaire = nomSocietaire; }
+        public TypeDocumentSocietaire getTypeDoc() { return typeDoc; }
+        public void setTypeDoc(TypeDocumentSocietaire typeDoc) { this.typeDoc = typeDoc; }
+        public String getNomFichier() { return nomFichier; }
+        public void setNomFichier(String nomFichier) { this.nomFichier = nomFichier; }
+        public String getCheminFichierComplet() { return cheminFichierComplet; }
+        public void setCheminFichierComplet(String cheminFichierComplet) { this.cheminFichierComplet = cheminFichierComplet; }
+        public LocalDateTime getDateUpload() { return dateUpload; }
+        public void setDateUpload(LocalDateTime dateUpload) { this.dateUpload = dateUpload; }
     }
 }

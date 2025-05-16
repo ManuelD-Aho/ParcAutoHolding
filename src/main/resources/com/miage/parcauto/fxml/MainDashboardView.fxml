@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.control.Button?>
+
+<BorderPane fx:id="conteneurPrincipal" prefHeight="800.0" prefWidth="1200.0" stylesheets="@../css/styles.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="main.java.com.miage.parcauto.ViewController">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="header-bar" prefHeight="60.0">
+            <padding>
+                <Insets left="20.0" right="20.0" />
+            </padding>
+            <ImageView fitHeight="40.0" fitWidth="40.0" pickOnBounds="true" preserveRatio="true">
+                <!-- <image><Image url="@../images/logo_app_small.png" /></image> -->
+            </ImageView>
+            <Label text="ParcAuto MIAGE Holding" styleClass="header-title" HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+            <Label fx:id="labelUtilisateurConnecte" styleClass="user-info-label" />
+            <Button fx:id="boutonDeconnexion" text="Déconnexion" onAction="#actionSeDeconnecter" styleClass="button-deconnexion" />
+        </HBox>
+    </top>
+    <left>
+        <VBox fx:id="panneauNavigation" styleClass="navigation-panel" prefWidth="220.0" spacing="5.0">
+            <padding>
+                <Insets top="10.0" />
+            </padding>
+            <Button fx:id="boutonNavAccueil" text="Accueil" onAction="#chargerVueAccueil" styleClass="nav-button" prefWidth="Infinity"/>
+            <Button fx:id="boutonNavTableauDeBord" text="Tableau de Bord" onAction="#chargerVueTableauDeBord" styleClass="nav-button" prefWidth="Infinity"/>
+            <Separator fx:id="separateurVehicules" VBox.margin="\Insets{top=5.0, bottom=5.0}"/>
+            <Label fx:id="labelTitreSectionVehicules" text="Gestion du Parc" styleClass="nav-section-title"/>
+            <Button fx:id="boutonNavVehicules" text="Véhicules" onAction="#chargerVueVehicules" styleClass="nav-button" prefWidth="Infinity"/>
+            <Button fx:id="boutonNavMissions" text="Missions" onAction="#chargerVueMissions" styleClass="nav-button" prefWidth="Infinity"/>
+            <Button fx:id="boutonNavEntretiens" text="Entretiens" onAction="#chargerVueEntretiens" styleClass="nav-button" prefWidth="Infinity"/>
+            <Separator fx:id="separateurFinances" VBox.margin="\Insets{top=5.0, bottom=5.0}"/>
+            <Label fx:id="labelTitreSectionFinances" text="Finances & Documents" styleClass="nav-section-title"/>
+            <Button fx:id="boutonNavFinances" text="Comptes Sociétaires" onAction="#chargerVueFinances" styleClass="nav-button" prefWidth="Infinity"/>
+            <Button fx:id="boutonNavDocuments" text="Documents Sociétaires" onAction="#chargerVueDocuments" styleClass="nav-button" prefWidth="Infinity"/>
+            <Separator fx:id="separateurAdministration" VBox.margin="\Insets{top=5.0, bottom=5.0}"/>
+            <Label fx:id="labelTitreSectionAdministration" text="Administration" styleClass="nav-section-title"/>
+            <Button fx:id="boutonNavUtilisateurs" text="Gestion Utilisateurs" onAction="#chargerVueUtilisateurs" styleClass="nav-button" prefWidth="Infinity"/>
+            <Button fx:id="boutonNavRapports" text="Rapports & Stats" onAction="#chargerVueRapports" styleClass="nav-button" prefWidth="Infinity"/>
+            <Button fx:id="boutonNavParametres" text="Paramètres" onAction="#chargerVueParametres" styleClass="nav-button" prefWidth="Infinity"/>
+        </VBox>
+    </left>
+    <center>
+        <ScrollPane fx:id="conteneurContenuPrincipal" fitToWidth="true" fitToHeight="true" style="-fx-background-color: #ECF0F1;">
+            <content>
+                <VBox fx:id="zoneContenuDynamique" alignment="TOP_CENTER" spacing="20.0" style="-fx-background-color: transparent;">
+                    <padding><Insets top="20.0" left="20.0" right="20.0" bottom="20.0" /></padding>
+                    <!-- Le contenu sera chargé ici dynamiquement -->
+                </VBox>
+            </content>
+        </ScrollPane>
+    </center>
+</BorderPane>
